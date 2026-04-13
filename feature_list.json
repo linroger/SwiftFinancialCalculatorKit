@@ -1,0 +1,182 @@
+[
+  {
+    "id": "feature_app_shell_navigation",
+    "category": "foundation",
+    "description": "Main macOS shell provides a stable sidebar-detail experience with dashboard, calculator selection, help, preferences, and new-calculation flows.",
+    "steps": [
+      "Launch the app and confirm the main window appears with native macOS navigation.",
+      "Select dashboard and multiple calculator categories from the sidebar.",
+      "Open and dismiss the new calculation sheet, preferences, and help surfaces.",
+      "Verify selection changes update the detail pane without broken states."
+    ],
+    "passes": true
+  },
+  {
+    "id": "feature_dashboard_recent_activity",
+    "category": "functional",
+    "description": "Dashboard surfaces honest statistics, recent activity, and quick actions without misleading mock-live claims.",
+    "steps": [
+      "Open the dashboard after launch.",
+      "Review summary cards, quick actions, and recent activity.",
+      "Trigger a quick action and confirm it routes to the intended calculator.",
+      "Verify any market or activity surfaces clearly reflect real or mock data truthfully."
+    ],
+    "passes": false
+  },
+  {
+    "id": "feature_time_value_calculator",
+    "category": "functional",
+    "description": "Time Value of Money calculator accurately solves PV, FV, PMT, rate, and number of years with clear validation and charting.",
+    "steps": [
+      "Open the Time Value calculator.",
+      "Enter four of the five required variables and choose a target variable.",
+      "Run the calculation and verify the result and explanation.",
+      "Confirm chart data and validation errors behave correctly."
+    ],
+    "passes": false
+  },
+  {
+    "id": "feature_loan_mortgage_calculator",
+    "category": "functional",
+    "description": "Loan and mortgage workflows calculate payments, amortization, payoff changes, and insights accurately.",
+    "steps": [
+      "Open the loan or mortgage calculator.",
+      "Enter principal, rate, term, and optional down payment or extra payment.",
+      "Verify payment summary, amortization schedule, and payoff insights.",
+      "Confirm editing inputs updates results consistently."
+    ],
+    "passes": false
+  },
+  {
+    "id": "feature_bond_calculator",
+    "category": "functional",
+    "description": "Bond analysis supports price and yield workflows with cash-flow and sensitivity views.",
+    "steps": [
+      "Open the bond calculator.",
+      "Switch between price and yield modes.",
+      "Enter face value, coupon, maturity, and market inputs.",
+      "Verify result, supporting metrics, and chart/table outputs."
+    ],
+    "passes": false
+  },
+  {
+    "id": "feature_investment_analysis_calculator",
+    "category": "functional",
+    "description": "Investment analysis handles NPV, IRR, cash-flow editing, and scenario/sensitivity analysis accurately.",
+    "steps": [
+      "Open the investment calculator.",
+      "Enter an initial investment and a series of cash flows.",
+      "Run NPV, IRR, and combined analysis modes.",
+      "Verify the supporting analysis views use the same underlying data correctly."
+    ],
+    "passes": false
+  },
+  {
+    "id": "feature_options_pricing_calculator",
+    "category": "functional",
+    "description": "Options calculator prices calls and puts, reports Greeks, and uses non-placeholder sensitivity analysis.",
+    "steps": [
+      "Open the options calculator.",
+      "Enter spot price, strike, expiry, rate, volatility, and option type.",
+      "Verify the premium and Greeks are generated.",
+      "Confirm any analysis view is implemented and not labeled as a placeholder."
+    ],
+    "passes": false
+  },
+  {
+    "id": "feature_depreciation_calculator",
+    "category": "functional",
+    "description": "Depreciation calculator supports straight-line, declining-balance, sum-of-years-digits, and MACRS workflows with schedules.",
+    "steps": [
+      "Open the depreciation calculator.",
+      "Enter asset cost, salvage value, life, year, and method-specific inputs.",
+      "Run each supported method and verify the current-year result.",
+      "Review schedule and comparison outputs for correctness."
+    ],
+    "passes": false
+  },
+  {
+    "id": "feature_currency_converter",
+    "category": "functional",
+    "description": "Currency converter supports reliable conversions, honest rate sourcing, and history persistence.",
+    "steps": [
+      "Open the currency converter.",
+      "Convert between two currencies using the displayed rate source.",
+      "Save the conversion and reopen history.",
+      "Delete or favorite a saved conversion and verify the state persists."
+    ],
+    "passes": false
+  },
+  {
+    "id": "feature_unit_converter",
+    "category": "functional",
+    "description": "Unit converter supports multiple categories, quick conversions, and history management.",
+    "steps": [
+      "Open the unit converter.",
+      "Choose a unit category and convert between supported units.",
+      "Verify quick conversions and saved history entries.",
+      "Confirm conversion results remain correct after input edits."
+    ],
+    "passes": false
+  },
+  {
+    "id": "feature_math_expression_calculator",
+    "category": "functional",
+    "description": "Math expression evaluator supports variables, example expressions, and trustworthy calculation history.",
+    "steps": [
+      "Open the math expression calculator.",
+      "Enter an expression with variables and provide values for those variables.",
+      "Evaluate the expression and verify the result uses the supplied variables.",
+      "Save or recall the expression from history."
+    ],
+    "passes": false
+  },
+  {
+    "id": "feature_persistence_favorites_history",
+    "category": "foundation",
+    "description": "Saved calculations, favorites, search, recent history, and delete/edit flows work consistently across supported calculation types.",
+    "steps": [
+      "Create representative calculations in multiple calculators.",
+      "Mark one as a favorite and verify it appears in filtered views.",
+      "Search for a saved calculation by name or note.",
+      "Delete a saved calculation and confirm it no longer appears in recents or dashboard summaries."
+    ],
+    "passes": false
+  },
+  {
+    "id": "feature_preferences_help_and_desktop_polish",
+    "category": "quality",
+    "description": "Preferences, help, keyboard affordances, and desktop presentation are polished and truthful.",
+    "steps": [
+      "Open preferences and modify formatting or currency settings.",
+      "Close and relaunch the app to confirm preferences persist.",
+      "Open help and verify it reflects actual supported functionality.",
+      "Use toolbar and keyboard-accessible paths for primary actions."
+    ],
+    "passes": false
+  },
+  {
+    "id": "feature_export_import_reporting",
+    "category": "quality",
+    "description": "Import/export and reporting flows work for supported calculation data and are documented accurately.",
+    "steps": [
+      "Create a calculation and invoke export from the app.",
+      "Verify the exported content contains the expected data.",
+      "Import supported data back into the app when applicable.",
+      "Confirm README instructions match the implemented flow."
+    ],
+    "passes": false
+  },
+  {
+    "id": "feature_new_retirement_or_planning_tool",
+    "category": "enhancement",
+    "description": "The app includes at least one new high-value planning workflow beyond the original foundation, such as retirement planning or advanced savings analysis.",
+    "steps": [
+      "Discover the new planning tool from the app navigation.",
+      "Enter representative planning inputs.",
+      "Review projections, summary metrics, and explanatory guidance.",
+      "Save the result and verify it participates in the same persistence and documentation flows as other calculators."
+    ],
+    "passes": false
+  }
+]

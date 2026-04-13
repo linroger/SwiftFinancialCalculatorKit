@@ -1,0 +1,54 @@
+Project Overview
+FinancialCalculatorKit is a native macOS SwiftUI + SwiftData financial toolkit with multiple calculator surfaces, charting, and saved calculation models. The repository entered this session without a working long-running-agent harness, without meaningful tests, and with an invalid Git `HEAD`, so the first priority is to establish continuity and deterministic build/run workflows before deep feature edits.
+
+Session Log
+
+- 2026-04-13 20:09:17 UTC
+  Branch: invalid HEAD / no readable commit history
+  Feature or bug worked on: project discovery, architecture mapping, and harness initialization
+  Files touched: `handoff.md`, `feature_list.json`, `agent-progress.txt`, `PLANS.md`, `init.sh`, `script/build_and_run.sh`, `.codex/environments/environment.toml`
+  Summary:
+  Read the project documentation and inspected the app shell, view model, utilities, services, calculation models, major calculator views, dashboard, charts, and shared components. Confirmed the codebase compiles with SwiftPM and Xcode build, but found major product gaps: monolithic root views, misleading dashboard “Live Data,” no-op preference persistence, incomplete recent-calculation deletion, ignored expression variables, placeholder options analysis text, and a heavily polluted Xcode project source graph.
+  Tests and verification:
+  Ran `swift build` successfully.
+  Ran `xcodebuild -list -project FinancialCalculatorKit.xcodeproj` successfully.
+  Ran `xcodebuild -project FinancialCalculatorKit.xcodeproj -scheme FinancialCalculatorKit -destination 'platform=macOS' build` successfully.
+  Ran `xcodebuild ... test` concurrently with build once and hit a locked build database; this is a workflow issue that needs serialized test execution.
+  Added `init.sh` and ran it successfully.
+  Added `script/build_and_run.sh` and `./script/build_and_run.sh --verify` failed with duplicate generated output errors from the Xcode project, which is now the clearest concrete blocker.
+  Result:
+  Harness established; implementation slice not started yet.
+  Remaining follow-ups / known issues:
+  Duplicate and unrelated PBX source entries can escalate into deterministic build failures.
+  Help, preferences, and dashboard promise capabilities that are not fully implemented.
+  Persistence flows are incomplete across calculation types.
+  Financial math needs verification beyond successful compilation.
+
+Next Steps
+- Clean or regenerate the Xcode project source phases so `script/build_and_run.sh --verify` succeeds reliably.
+- Stabilize the app shell before touching individual calculator features.
+- Re-run serialized build and test commands after project hygiene fixes, then start the shared persistence slice.
+
+- 2026-04-13 20:43:07 UTC
+  Branch: invalid HEAD / no readable commit history
+  Feature or bug worked on: `feature_app_shell_navigation`
+  Files touched: `FinancialCalculatorKit.xcodeproj/project.pbxproj`, `FinancialCalculatorKit/ViewModels/MainViewModel.swift`, `FinancialCalculatorKit/ContentView.swift`, `FinancialCalculatorKit/Views/DashboardView.swift`, `FinancialCalculatorKitTests/FinancialCalculatorKitTests.swift`, `FinancialCalculatorKitUITests/FinancialCalculatorKitUITests.swift`, `FinancialCalculatorKitUITests/FinancialCalculatorKitUITestsLaunchTests.swift`, `feature_list.json`, `handoff.md`, `agent-progress.txt`
+  Summary:
+  Cleaned the corrupted Xcode project source phases so the scripted build-and-launch path stopped producing duplicate generated outputs. Refactored the app shell to use a single sheet-routing enum in `MainViewModel`, wired toolbar and dashboard entry points through shared view-model actions, removed fragile sheet state fan-out, and added macOS shell smoke coverage for keyboard shortcuts and sidebar calculator navigation.
+  Tests and verification:
+  Ran `plutil -lint FinancialCalculatorKit.xcodeproj/project.pbxproj` successfully.
+  Ran `xcodebuild -project FinancialCalculatorKit.xcodeproj -scheme FinancialCalculatorKit -destination 'platform=macOS' -derivedDataPath .derivedData test` successfully.
+  Verified unit tests `createNewCalculationPresentsCalculatorPicker()`, `sheetRoutingIsExclusive()`, and `openCalculatorAndDashboardResetSelection()` passed.
+  Verified UI tests opened New Calculation with `⌘N`, Preferences with `⌘,`, Help with `⌘⇧/`, and navigated to Loan Calculator successfully.
+  Ran `./script/build_and_run.sh --verify` successfully and observed `FinancialCalculatorKit launched successfully.`
+  Result:
+  `feature_app_shell_navigation` is now passing and the app has a deterministic local build, launch, and shell-navigation verification path.
+  Remaining follow-ups / known issues:
+  Git refs are still broken, so commit/push work remains blocked.
+  Dashboard truthfulness still needs cleanup, especially around mock-versus-live positioning.
+  Preference persistence, recents/favorites/delete flows, and calculator math validation are still incomplete.
+
+Next Steps
+- Repair dashboard content and quick actions so the landing screen only promises what the app actually implements.
+- Implement real preference persistence plus recent/favorite/delete flows across saved calculations.
+- Keep `./script/build_and_run.sh --verify` and the shell UI smoke green while moving into the next slice.
