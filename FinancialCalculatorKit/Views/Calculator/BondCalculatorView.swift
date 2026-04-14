@@ -81,7 +81,8 @@ struct BondCalculatorView: View {
             if let result = calculationResult {
                 SensitivityAnalysisView(
                     baseResult: result,
-                    bondData: currentBondData
+                    bondData: currentBondData,
+                    currency: currency
                 )
             }
         }
@@ -553,30 +554,20 @@ struct BondCalculatorView: View {
                 )
             }
             
-            // Yield curve comparison (mock data for demo)
-            GroupBox("Market Context") {
+            GroupBox("Rate Shock Profile") {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Yield Curve Comparison")
+                    Text("Bond Price Under Rate Shocks")
                         .font(.headline)
                         .fontWeight(.semibold)
                     
                     Chart {
-                        ForEach(generateYieldCurveData(), id: \.maturity) { point in
+                        ForEach(generateRateShockData(), id: \.shockBps) { point in
                             LineMark(
-                                x: .value("Maturity", point.maturity),
-                                y: .value("Yield", point.yield)
+                                x: .value("Shock", point.shockBps),
+                                y: .value("Price", point.price)
                             )
                             .foregroundStyle(.blue)
                             .interpolationMethod(.catmullRom)
-                            
-                            if abs(point.maturity - yearsToMaturity) < 0.5 {
-                                PointMark(
-                                    x: .value("Maturity", point.maturity),
-                                    y: .value("Yield", point.yield)
-                                )
-                                .foregroundStyle(.red)
-                                .symbolSize(100)
-                            }
                         }
                     }
                     .frame(height: 200)
@@ -585,8 +576,8 @@ struct BondCalculatorView: View {
                             AxisGridLine()
                             AxisTick()
                             AxisValueLabel {
-                                if let years = value.as(Double.self) {
-                                    Text("\(Int(years))Y")
+                                if let shock = value.as(Double.self) {
+                                    Text("\(Int(shock))bp")
                                 }
                             }
                         }
@@ -596,14 +587,14 @@ struct BondCalculatorView: View {
                             AxisGridLine()
                             AxisTick()
                             AxisValueLabel {
-                                if let yield = value.as(Double.self) {
-                                    Text("\(yield, specifier: "%.1f")%")
+                                if let price = value.as(Double.self) {
+                                    Text(currency.formatValue(price))
                                 }
                             }
                         }
                     }
                     
-                    Text("Red dot shows current bond's position on the yield curve")
+                    Text("This chart uses actual repricing at each shocked market rate, so it reflects the bond's non-linear response rather than a generic sample curve.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -804,22 +795,20 @@ struct BondCalculatorView: View {
         return insights
     }
     
-    private func generateYieldCurveData() -> [YieldCurvePoint] {
-        // Mock yield curve data for demonstration
-        let baseYield = marketRate ?? (currentPrice != nil ? calculationResult?.primaryValue ?? 5.0 : 5.0)
-        
-        return [
-            YieldCurvePoint(maturity: 0.25, yield: baseYield - 1.5),
-            YieldCurvePoint(maturity: 0.5, yield: baseYield - 1.2),
-            YieldCurvePoint(maturity: 1, yield: baseYield - 0.8),
-            YieldCurvePoint(maturity: 2, yield: baseYield - 0.4),
-            YieldCurvePoint(maturity: 3, yield: baseYield - 0.2),
-            YieldCurvePoint(maturity: 5, yield: baseYield),
-            YieldCurvePoint(maturity: 7, yield: baseYield + 0.2),
-            YieldCurvePoint(maturity: 10, yield: baseYield + 0.4),
-            YieldCurvePoint(maturity: 20, yield: baseYield + 0.6),
-            YieldCurvePoint(maturity: 30, yield: baseYield + 0.7)
-        ]
+    private func generateRateShockData() -> [RateShockPoint] {
+        let baseYield = marketRate ?? calculationResult?.primaryValue ?? couponRate
+
+        return stride(from: -200.0, through: 200.0, by: 50.0).map { shock in
+            let shockedYield = max(baseYield + (shock / 100), 0.01)
+            let price = CalculationEngine.calculateBondPrice(
+                faceValue: faceValue,
+                couponRate: couponRate,
+                marketRate: shockedYield,
+                yearsToMaturity: yearsToMaturity,
+                paymentsPerYear: paymentsPerYear
+            )
+            return RateShockPoint(shockBps: shock, price: price)
+        }
     }
 }
 
@@ -828,8 +817,34 @@ struct BondCalculatorView: View {
 struct SensitivityAnalysisView: View {
     let baseResult: CalculationResult
     let bondData: (faceValue: Double, couponRate: Double, yearsToMaturity: Double, paymentsPerYear: Double)
+    let currency: Currency
     @Environment(\.dismiss) private var dismiss
-    
+
+    private struct SensitivityPoint: Identifiable {
+        let id = UUID()
+        let shockBps: Double
+        let repriced: Double
+        let estimated: Double
+    }
+
+    private var referenceYield: Double {
+        baseResult.secondaryValues["Market Rate"] ?? baseResult.primaryValue
+    }
+
+    private var currentPrice: Double {
+        baseResult.secondaryValues["Current Price"] ?? baseResult.primaryValue
+    }
+
+    private var riskMeasures: CalculationEngine.BondRiskMeasures {
+        CalculationEngine.calculateBondRiskMeasures(
+            faceValue: bondData.faceValue,
+            couponRate: bondData.couponRate,
+            marketRate: referenceYield,
+            yearsToMaturity: bondData.yearsToMaturity,
+            paymentsPerYear: bondData.paymentsPerYear
+        )
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -838,17 +853,23 @@ struct SensitivityAnalysisView: View {
                         .font(.title)
                         .fontWeight(.bold)
                         .padding()
-                    
-                    // Price vs Yield chart
-                    GroupBox("Bond Price vs Market Yield") {
+
+                    GroupBox("Repricing vs Duration+Convexity Estimate") {
                         Chart {
-                            ForEach(generateSensitivityData(), id: \.yield) { point in
+                            ForEach(generateSensitivityData()) { point in
                                 LineMark(
-                                    x: .value("Yield", point.yield),
-                                    y: .value("Price", point.price)
+                                    x: .value("Shock", point.shockBps),
+                                    y: .value("Actual Repricing", point.repriced)
                                 )
                                 .foregroundStyle(.blue)
                                 .interpolationMethod(.catmullRom)
+
+                                LineMark(
+                                    x: .value("Shock", point.shockBps),
+                                    y: .value("Estimated", point.estimated)
+                                )
+                                .foregroundStyle(.orange)
+                                .lineStyle(StrokeStyle(lineWidth: 2, dash: [6, 4]))
                             }
                         }
                         .frame(height: 300)
@@ -857,8 +878,8 @@ struct SensitivityAnalysisView: View {
                                 AxisGridLine()
                                 AxisTick()
                                 AxisValueLabel {
-                                    if let yield = value.as(Double.self) {
-                                        Text("\(yield, specifier: "%.1f")%")
+                                    if let shock = value.as(Double.self) {
+                                        Text("\(Int(shock))bp")
                                     }
                                 }
                             }
@@ -869,24 +890,23 @@ struct SensitivityAnalysisView: View {
                                 AxisTick()
                                 AxisValueLabel {
                                     if let price = value.as(Double.self) {
-                                        Text("$\(Int(price))")
+                                        Text(currency.formatValue(price))
                                     }
                                 }
                             }
                         }
                         .padding()
                     }
-                    
-                    // Duration and convexity metrics
+
                     GroupBox("Risk Metrics") {
                         VStack(alignment: .leading, spacing: 12) {
-                            DetailRow(title: "Modified Duration", value: String(format: "%.2f years", calculateModifiedDuration()))
-                            DetailRow(title: "Macaulay Duration", value: String(format: "%.2f years", calculateMacaulayDuration()))
-                            DetailRow(title: "Convexity", value: String(format: "%.2f", calculateConvexity()))
-                            
+                            DetailRow(title: "Modified Duration", value: String(format: "%.2f years", riskMeasures.modifiedDuration))
+                            DetailRow(title: "Macaulay Duration", value: String(format: "%.2f years", riskMeasures.macaulayDuration))
+                            DetailRow(title: "Convexity", value: String(format: "%.2f", riskMeasures.convexity))
+
                             Divider()
-                            
-                            Text("Duration measures price sensitivity to yield changes. Higher duration = higher price volatility.")
+
+                            Text("Blue is the actual repriced bond. Orange is the duration-plus-convexity approximation, which is often how risk desks estimate shock sensitivity before a full repricing run.")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -904,39 +924,32 @@ struct SensitivityAnalysisView: View {
                 }
             }
         }
-        .frame(minWidth: 600, minHeight: 500)
+        .frame(minWidth: 720, minHeight: 560)
     }
-    
+
     private func generateSensitivityData() -> [SensitivityPoint] {
-        var data: [SensitivityPoint] = []
-        
-        for i in stride(from: 1.0, through: 10.0, by: 0.5) {
-            let price = CalculationEngine.calculateBondPrice(
+        stride(from: -200.0, through: 200.0, by: 25.0).map { shock in
+            let shockedYield = max(referenceYield + (shock / 100), 0.01)
+            let repriced = CalculationEngine.calculateBondPrice(
                 faceValue: bondData.faceValue,
                 couponRate: bondData.couponRate,
-                marketRate: i,
+                marketRate: shockedYield,
                 yearsToMaturity: bondData.yearsToMaturity,
                 paymentsPerYear: bondData.paymentsPerYear
             )
-            data.append(SensitivityPoint(yield: i, price: price))
+            let estimatedChange = CalculationEngine.estimateBondPriceChange(
+                currentPrice: currentPrice,
+                modifiedDuration: riskMeasures.modifiedDuration,
+                convexity: riskMeasures.convexity,
+                yieldChange: shock / 10000
+            )
+
+            return SensitivityPoint(
+                shockBps: shock,
+                repriced: repriced,
+                estimated: currentPrice + estimatedChange
+            )
         }
-        
-        return data
-    }
-    
-    private func calculateModifiedDuration() -> Double {
-        // Simplified duration calculation
-        return bondData.yearsToMaturity * 0.8
-    }
-    
-    private func calculateMacaulayDuration() -> Double {
-        // Simplified duration calculation
-        return bondData.yearsToMaturity * 0.85
-    }
-    
-    private func calculateConvexity() -> Double {
-        // Simplified convexity calculation
-        return bondData.yearsToMaturity * bondData.yearsToMaturity * 0.1
     }
 }
 
@@ -999,13 +1012,8 @@ struct CashFlowScheduleView: View {
 
 // MARK: - Supporting Types
 
-struct YieldCurvePoint {
-    let maturity: Double
-    let yield: Double
-}
-
-struct SensitivityPoint {
-    let yield: Double
+struct RateShockPoint {
+    let shockBps: Double
     let price: Double
 }
 

@@ -96,3 +96,29 @@ The first coding slice should be: project hygiene + app shell stabilization.
 - `xcodebuild -project FinancialCalculatorKit.xcodeproj -scheme FinancialCalculatorKit -destination 'platform=macOS' -derivedDataPath .derivedData test`
 - Launch app via `script/build_and_run.sh --verify`
 - Manual walkthrough of dashboard, sidebar selection, preferences, help, and at least one calculator
+
+## Current Slice: Advanced Analytics And TVM Overhaul
+
+### User-driven objective
+- Make the Time Value of Money view feel substantially more professional and less superficial.
+- Replace placeholder or demo-only analytics in options, bond, and currency flows with real working functionality.
+- Add genuinely useful capabilities rather than cosmetic churn.
+
+### Scope for this slice
+1. Overhaul the TVM screen into a planning workspace with stronger hierarchy, clearer solve-for behavior, richer summary metrics, and scenario charts.
+2. Add real advanced TVM insights such as contribution breakdown, effective annual rate, projected growth timeline, milestone checkpoints, and scenario comparison.
+3. Replace the options placeholder analysis with complete Greeks coverage and a working volatility surface/sensitivity visualization.
+4. Replace simplified bond sensitivity metrics with true duration and convexity calculations plus decision-useful charts.
+5. Replace mock FX conversion logic with a real live-rate service backed by the Frankfurter API and expose rate freshness/source in the UI.
+
+### Why this order
+- TVM is the weakest flagship screen in the current UX and the most obvious “basic” surface.
+- Shared analytics work in the calculation engine improves multiple calculators at once.
+- The live currency service removes one of the clearest honesty gaps in the product.
+
+### Acceptance expectations for this slice
+- TVM no longer presents a sparse empty-state layout; it renders a polished result workspace with actionable insights and charts.
+- Options analysis surfaces show more than Delta/Gamma and the volatility surface is no longer placeholder text.
+- Bond sensitivity analysis uses engine-backed duration/convexity values and visualizes rate-shock behavior.
+- Currency conversion fetches live rates from a real provider, exposes last-updated/source information, and still degrades safely if the network fails.
+- Build, test, and scripted launch remain green after the changes.

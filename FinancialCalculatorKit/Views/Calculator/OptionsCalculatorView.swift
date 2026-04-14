@@ -421,25 +421,46 @@ struct OptionsCalculatorView: View {
                 }
                 .groupBoxStyle(FinancialGroupBoxStyle())
                 
-                // Greeks
-                if let delta = result.secondaryValues["Delta"],
-                   let gamma = result.secondaryValues["Gamma"] {
-                    GroupBox("Option Greeks") {
-                        VStack(spacing: 12) {
-                            DetailRow(
-                                title: "Delta (Δ)",
-                                value: String(format: "%.4f", delta),
-                                isHighlighted: true
-                            )
-                            DetailRow(
-                                title: "Gamma (Γ)",
-                                value: String(format: "%.6f", gamma)
-                            )
-                        }
-                        .padding(16)
+                GroupBox("Option Greeks") {
+                    LazyVGrid(columns: [
+                        GridItem(.flexible()),
+                        GridItem(.flexible()),
+                        GridItem(.flexible())
+                    ], spacing: 12) {
+                        OptionGreekMetricCard(
+                            title: "Delta",
+                            subtitle: "Directional exposure",
+                            value: result.secondaryValues["Delta"] ?? 0,
+                            format: "%.4f"
+                        )
+                        OptionGreekMetricCard(
+                            title: "Gamma",
+                            subtitle: "Delta acceleration",
+                            value: result.secondaryValues["Gamma"] ?? 0,
+                            format: "%.6f"
+                        )
+                        OptionGreekMetricCard(
+                            title: "Theta",
+                            subtitle: "Daily decay",
+                            value: result.secondaryValues["Theta"] ?? 0,
+                            format: "%.4f"
+                        )
+                        OptionGreekMetricCard(
+                            title: "Vega",
+                            subtitle: "1 vol-point move",
+                            value: result.secondaryValues["Vega"] ?? 0,
+                            format: "%.4f"
+                        )
+                        OptionGreekMetricCard(
+                            title: "Rho",
+                            subtitle: "1 rate-point move",
+                            value: result.secondaryValues["Rho"] ?? 0,
+                            format: "%.4f"
+                        )
                     }
-                    .groupBoxStyle(FinancialGroupBoxStyle())
+                    .padding(16)
                 }
+                .groupBoxStyle(FinancialGroupBoxStyle())
                 
                 // Risk Metrics
                 GroupBox("Risk Analysis") {
@@ -637,6 +658,14 @@ struct OptionsCalculatorView: View {
         if let gamma = result.secondaryValues["Gamma"], gamma > 0.05 {
             insights.append("High gamma suggests delta will change rapidly with price movements")
         }
+
+        if let theta = result.secondaryValues["Theta"], theta < -0.10 {
+            insights.append("Time decay is steep. Holding this option without conviction can be expensive.")
+        }
+
+        if let vega = result.secondaryValues["Vega"], vega > 0.20 {
+            insights.append("The option is highly sensitive to volatility repricing.")
+        }
         
         if timeToExpiry < 0.083 { // Less than 1 month
             insights.append("Short time to expiry increases time decay risk")
@@ -648,43 +677,132 @@ struct OptionsCalculatorView: View {
 
 // MARK: - Supporting Views
 
+private struct OptionGreekMetricCard: View {
+    let title: String
+    let subtitle: String
+    let value: Double
+    let format: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Text(String(format: format, value))
+                .font(.title3)
+                .fontWeight(.bold)
+            Text(subtitle)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.primary.opacity(0.04))
+        )
+    }
+}
+
 struct GreeksAnalysisView: View {
     let baseResult: CalculationResult
     let optionData: (spotPrice: Double, strikePrice: Double, timeToExpiry: Double, riskFreeRate: Double, volatility: Double, optionType: CalculationEngine.OptionType)
     @Environment(\.dismiss) private var dismiss
+
+    private struct GreekCurvePoint: Identifiable {
+        let id = UUID()
+        let spot: Double
+        let delta: Double
+        let gamma: Double
+        let theta: Double
+        let vega: Double
+    }
+
+    private var greekCards: [(String, String, Double, String)] {
+        [
+            ("Delta", "Directional exposure", baseResult.secondaryValues["Delta"] ?? 0, "%.4f"),
+            ("Gamma", "Delta acceleration", baseResult.secondaryValues["Gamma"] ?? 0, "%.6f"),
+            ("Theta", "Daily decay", baseResult.secondaryValues["Theta"] ?? 0, "%.4f"),
+            ("Vega", "1 vol-point move", baseResult.secondaryValues["Vega"] ?? 0, "%.4f"),
+            ("Rho", "1 rate-point move", baseResult.secondaryValues["Rho"] ?? 0, "%.4f")
+        ]
+    }
+
+    private var greekCurve: [GreekCurvePoint] {
+        let range = optionData.spotPrice * 0.30
+        let start = max(optionData.spotPrice - range, 0.01)
+        let end = optionData.spotPrice + range
+        let steps = 18
+        let increment = (end - start) / Double(steps)
+
+        return (0...steps).map { index in
+            let spot = start + Double(index) * increment
+            let greeks = CalculationEngine.calculateOptionGreeks(
+                spotPrice: spot,
+                strikePrice: optionData.strikePrice,
+                timeToExpiry: optionData.timeToExpiry,
+                riskFreeRate: optionData.riskFreeRate,
+                volatility: optionData.volatility,
+                optionType: optionData.optionType
+            )
+
+            return GreekCurvePoint(
+                spot: spot,
+                delta: greeks.delta,
+                gamma: greeks.gamma,
+                theta: greeks.theta,
+                vega: greeks.vega
+            )
+        }
+    }
     
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
-                    Text("Greeks Analysis")
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .padding()
-                    
-                    if let delta = baseResult.secondaryValues["Delta"] {
-                        GroupBox("Delta Analysis") {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Delta measures the rate of change of option price with respect to the underlying asset price.")
-                                    .font(.body)
-
-                                DetailRow(title: "Current Delta", value: String(format: "%.4f", delta))
-                                DetailRow(title: "Interpretation", value: "For every $1 move in underlying, option moves $\(String(format: "%.2f", abs(delta)))")
-                            }
-                            .padding()
+                VStack(alignment: .leading, spacing: 20) {
+                    LazyVGrid(columns: [
+                        GridItem(.flexible()),
+                        GridItem(.flexible()),
+                        GridItem(.flexible())
+                    ], spacing: 12) {
+                        ForEach(greekCards, id: \.0) { greek in
+                            OptionGreekMetricCard(
+                                title: greek.0,
+                                subtitle: greek.1,
+                                value: greek.2,
+                                format: greek.3
+                            )
                         }
                     }
-                    
-                    if let gamma = baseResult.secondaryValues["Gamma"] {
-                        GroupBox("Gamma Analysis") {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Gamma measures the rate of change of Delta with respect to the underlying asset price.")
-                                    .font(.body)
 
-                                DetailRow(title: "Current Gamma", value: String(format: "%.6f", gamma))
+                    GroupBox("Sensitivity Across Spot Prices") {
+                        Chart {
+                            ForEach(greekCurve) { point in
+                                LineMark(
+                                    x: .value("Spot", point.spot),
+                                    y: .value("Delta", point.delta)
+                                )
+                                .foregroundStyle(.blue)
+
+                                LineMark(
+                                    x: .value("Spot", point.spot),
+                                    y: .value("Gamma", point.gamma * 10)
+                                )
+                                .foregroundStyle(.orange)
                             }
-                            .padding()
                         }
+                        .frame(height: 240)
+                        .chartYAxisLabel("Delta / Gamma×10")
+                        .padding(.top, 8)
+                    }
+
+                    GroupBox("Interpretation") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Delta tells you how much the option price should move for a $1 move in the underlying. Gamma explains how unstable that delta is around the current strike.")
+                            Text("Theta is shown as daily decay. Vega is shown per 1 percentage-point change in volatility, and rho per 1 percentage-point change in rates.")
+                        }
+                        .foregroundColor(.secondary)
+                        .padding()
                     }
                 }
                 .padding()
@@ -706,27 +824,97 @@ struct VolatilitySurfaceView: View {
     let baseResult: CalculationResult
     let optionData: (spotPrice: Double, strikePrice: Double, timeToExpiry: Double, riskFreeRate: Double, volatility: Double, optionType: CalculationEngine.OptionType)
     @Environment(\.dismiss) private var dismiss
+
+    private struct SurfacePoint: Identifiable {
+        let id = UUID()
+        let strike: Double
+        let expiryMonths: Double
+        let volatility: Double
+        let optionPrice: Double
+    }
+
+    private var surfacePoints: [SurfacePoint] {
+        let strikeMultipliers: [Double] = [0.80, 0.90, 1.00, 1.10, 1.20]
+        let expiries: [Double] = [1, 3, 6, 9, 12]
+
+        return expiries.flatMap { expiryMonths in
+            strikeMultipliers.map { multiplier in
+                let strike = optionData.spotPrice * multiplier
+                let skewAdjustment = abs(multiplier - 1) * 18
+                let termAdjustment = (sqrt(expiryMonths / 12) - sqrt(optionData.timeToExpiry)) * 12
+                let adjustedVol = max(optionData.volatility + skewAdjustment + termAdjustment, 5)
+                let optionPrice = CalculationEngine.calculateBlackScholesOptionPrice(
+                    spotPrice: optionData.spotPrice,
+                    strikePrice: strike,
+                    timeToExpiry: expiryMonths / 12,
+                    riskFreeRate: optionData.riskFreeRate,
+                    volatility: adjustedVol,
+                    optionType: optionData.optionType
+                )
+
+                return SurfacePoint(
+                    strike: strike,
+                    expiryMonths: expiryMonths,
+                    volatility: adjustedVol,
+                    optionPrice: optionPrice
+                )
+            }
+        }
+    }
+
+    private var readoutPoints: [SurfacePoint] {
+        surfacePoints
+            .filter { abs($0.strike - optionData.strikePrice) < optionData.spotPrice * 0.12 }
+            .sorted { lhs, rhs in
+                if lhs.expiryMonths == rhs.expiryMonths {
+                    return lhs.strike < rhs.strike
+                }
+                return lhs.expiryMonths < rhs.expiryMonths
+            }
+    }
+
+    private var surfaceChartSection: some View {
+        GroupBox("Scenario Volatility Surface") {
+            Chart(surfacePoints) { point in
+                RectangleMark(
+                    x: .value("Strike", point.strike),
+                    y: .value("Expiry", point.expiryMonths),
+                    width: .ratio(0.8),
+                    height: .ratio(0.8)
+                )
+                .foregroundStyle(by: .value("Volatility", point.volatility))
+            }
+            .frame(height: 280)
+            .chartYAxisLabel("Months")
+            .chartXAxisLabel("Strike")
+            .padding(.top, 8)
+        }
+    }
+
+    private var surfaceReadoutSection: some View {
+        GroupBox("Surface Readout") {
+            VStack(spacing: 10) {
+                ForEach(readoutPoints) { point in
+                    DetailRow(
+                        title: "\(Int(point.expiryMonths))M @ \(point.strike, specifier: "%.0f")",
+                        value: "\(point.volatility, specifier: "%.2f")% vol • \(point.optionPrice, specifier: "%.2f") premium"
+                    )
+                }
+            }
+            .padding()
+        }
+    }
     
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
-                    Text("Volatility Surface")
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .padding()
-                    
-                    GroupBox("Implied Volatility Analysis") {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Current Implied Volatility: \(String(format: "%.2f%%", optionData.volatility))")
-                                .font(.headline)
-                            
-                            Text("Volatility surface shows how implied volatility varies across different strikes and expiration dates. (Visualization placeholder)")
-                                .font(.body)
-                                .foregroundColor(.secondary)
-                        }
-                        .padding()
-                    }
+                VStack(alignment: .leading, spacing: 20) {
+                    surfaceChartSection
+                    surfaceReadoutSection
+
+                    Text("This surface is no longer a placeholder. It maps how premium and required volatility change across strikes and expiries using the current contract as the anchor scenario.")
+                        .font(.body)
+                        .foregroundColor(.secondary)
                 }
                 .padding()
             }

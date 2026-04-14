@@ -181,6 +181,18 @@ final class BondCalculation {
         
         secondaryValues["Years to Maturity"] = yearsToMaturity
         secondaryValues["Total Payments"] = yearsToMaturity * paymentsPerYear
+
+        let referenceRate = marketRate ?? calculatedValue
+        let riskMeasures = CalculationEngine.calculateBondRiskMeasures(
+            faceValue: faceValue,
+            couponRate: couponRate,
+            marketRate: referenceRate,
+            yearsToMaturity: yearsToMaturity,
+            paymentsPerYear: paymentsPerYear
+        )
+        secondaryValues["Modified Duration"] = riskMeasures.modifiedDuration
+        secondaryValues["Macaulay Duration"] = riskMeasures.macaulayDuration
+        secondaryValues["Convexity"] = riskMeasures.convexity
         
         // Generate cash flow data
         let chartData = generateCashFlowData()

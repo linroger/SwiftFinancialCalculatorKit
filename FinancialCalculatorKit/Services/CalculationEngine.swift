@@ -13,6 +13,19 @@ import MathParser
 
 /// Core financial calculation engine implementing standard financial formulas with advanced mathematical capabilities
 class CalculationEngine {
+    struct OptionGreeks {
+        let delta: Double
+        let gamma: Double
+        let theta: Double
+        let vega: Double
+        let rho: Double
+    }
+
+    struct BondRiskMeasures {
+        let modifiedDuration: Double
+        let macaulayDuration: Double
+        let convexity: Double
+    }
     
     // MARK: - Mathematical Expression Evaluation
     
@@ -188,6 +201,54 @@ class CalculationEngine {
         
         return convexitySum / (bondPrice * pow(1 + periodicRate, 2) * pow(paymentsPerYear, 2))
     }
+
+    static func calculateBondRiskMeasures(
+        faceValue: Double,
+        couponRate: Double,
+        marketRate: Double,
+        yearsToMaturity: Double,
+        paymentsPerYear: Double = 2
+    ) -> BondRiskMeasures {
+        let macaulayDuration = calculateMacaulayDuration(
+            faceValue: faceValue,
+            couponRate: couponRate,
+            marketRate: marketRate,
+            yearsToMaturity: yearsToMaturity,
+            paymentsPerYear: paymentsPerYear
+        )
+        let modifiedDuration = calculateModifiedDuration(
+            faceValue: faceValue,
+            couponRate: couponRate,
+            marketRate: marketRate,
+            yearsToMaturity: yearsToMaturity,
+            paymentsPerYear: paymentsPerYear
+        )
+        let convexity = calculateConvexity(
+            faceValue: faceValue,
+            couponRate: couponRate,
+            marketRate: marketRate,
+            yearsToMaturity: yearsToMaturity,
+            paymentsPerYear: paymentsPerYear
+        )
+
+        return BondRiskMeasures(
+            modifiedDuration: modifiedDuration,
+            macaulayDuration: macaulayDuration,
+            convexity: convexity
+        )
+    }
+
+    /// Approximates price impact using modified duration and convexity.
+    /// `yieldChange` is expressed as a decimal, so 100 bps = 0.01.
+    static func estimateBondPriceChange(
+        currentPrice: Double,
+        modifiedDuration: Double,
+        convexity: Double,
+        yieldChange: Double
+    ) -> Double {
+        let percentageChange = (-modifiedDuration * yieldChange) + (0.5 * convexity * pow(yieldChange, 2))
+        return currentPrice * percentageChange
+    }
     
     // MARK: - Options Pricing (Black-Scholes Model)
     
@@ -200,16 +261,25 @@ class CalculationEngine {
         volatility: Double,
         optionType: OptionType = .call
     ) -> Double {
-        let d1 = (Double.log(spotPrice / strikePrice) + (riskFreeRate / 100 + pow(volatility / 100, 2) / 2) * timeToExpiry) / 
-                 (volatility / 100 * Double.sqrt(timeToExpiry))
-        let d2 = d1 - volatility / 100 * Double.sqrt(timeToExpiry)
+        guard let terms = normalizedOptionTerms(
+            spotPrice: spotPrice,
+            strikePrice: strikePrice,
+            timeToExpiry: timeToExpiry,
+            riskFreeRate: riskFreeRate,
+            volatility: volatility
+        ) else {
+            return 0
+        }
+        
+        let d1 = terms.d1
+        let d2 = terms.d2
         
         let nd1 = cumulativeNormalDistribution(d1)
         let nd2 = cumulativeNormalDistribution(d2)
         let nNegD1 = cumulativeNormalDistribution(-d1)
         let nNegD2 = cumulativeNormalDistribution(-d2)
         
-        let discountFactor = Double.exp(-riskFreeRate / 100 * timeToExpiry)
+        let discountFactor = Double.exp(-terms.rate * timeToExpiry)
         
         switch optionType {
         case .call:
@@ -228,15 +298,174 @@ class CalculationEngine {
         volatility: Double,
         optionType: OptionType = .call
     ) -> Double {
-        let d1 = (Double.log(spotPrice / strikePrice) + (riskFreeRate / 100 + pow(volatility / 100, 2) / 2) * timeToExpiry) / 
-                 (volatility / 100 * Double.sqrt(timeToExpiry))
+        guard let terms = normalizedOptionTerms(
+            spotPrice: spotPrice,
+            strikePrice: strikePrice,
+            timeToExpiry: timeToExpiry,
+            riskFreeRate: riskFreeRate,
+            volatility: volatility
+        ) else {
+            return 0
+        }
         
         switch optionType {
         case .call:
-            return cumulativeNormalDistribution(d1)
+            return cumulativeNormalDistribution(terms.d1)
         case .put:
-            return cumulativeNormalDistribution(d1) - 1
+            return cumulativeNormalDistribution(terms.d1) - 1
         }
+    }
+
+    static func calculateOptionGamma(
+        spotPrice: Double,
+        strikePrice: Double,
+        timeToExpiry: Double,
+        riskFreeRate: Double,
+        volatility: Double
+    ) -> Double {
+        guard let terms = normalizedOptionTerms(
+            spotPrice: spotPrice,
+            strikePrice: strikePrice,
+            timeToExpiry: timeToExpiry,
+            riskFreeRate: riskFreeRate,
+            volatility: volatility
+        ) else {
+            return 0
+        }
+
+        return normalDensity(terms.d1) / (spotPrice * terms.sigma * Double.sqrt(timeToExpiry))
+    }
+
+    /// Returns theta per calendar day.
+    static func calculateOptionTheta(
+        spotPrice: Double,
+        strikePrice: Double,
+        timeToExpiry: Double,
+        riskFreeRate: Double,
+        volatility: Double,
+        optionType: OptionType = .call
+    ) -> Double {
+        guard let terms = normalizedOptionTerms(
+            spotPrice: spotPrice,
+            strikePrice: strikePrice,
+            timeToExpiry: timeToExpiry,
+            riskFreeRate: riskFreeRate,
+            volatility: volatility
+        ) else {
+            return 0
+        }
+
+        let firstTerm = -(spotPrice * normalDensity(terms.d1) * terms.sigma) / (2 * Double.sqrt(timeToExpiry))
+        let discountFactor = Double.exp(-terms.rate * timeToExpiry)
+
+        let annualTheta: Double
+        switch optionType {
+        case .call:
+            annualTheta = firstTerm - terms.rate * strikePrice * discountFactor * cumulativeNormalDistribution(terms.d2)
+        case .put:
+            annualTheta = firstTerm + terms.rate * strikePrice * discountFactor * cumulativeNormalDistribution(-terms.d2)
+        }
+
+        return annualTheta / 365
+    }
+
+    /// Returns vega for a 1 percentage-point volatility move.
+    static func calculateOptionVega(
+        spotPrice: Double,
+        strikePrice: Double,
+        timeToExpiry: Double,
+        riskFreeRate: Double,
+        volatility: Double
+    ) -> Double {
+        guard let terms = normalizedOptionTerms(
+            spotPrice: spotPrice,
+            strikePrice: strikePrice,
+            timeToExpiry: timeToExpiry,
+            riskFreeRate: riskFreeRate,
+            volatility: volatility
+        ) else {
+            return 0
+        }
+
+        return (spotPrice * normalDensity(terms.d1) * Double.sqrt(timeToExpiry)) / 100
+    }
+
+    /// Returns rho for a 1 percentage-point interest-rate move.
+    static func calculateOptionRho(
+        spotPrice: Double,
+        strikePrice: Double,
+        timeToExpiry: Double,
+        riskFreeRate: Double,
+        volatility: Double,
+        optionType: OptionType = .call
+    ) -> Double {
+        guard let terms = normalizedOptionTerms(
+            spotPrice: spotPrice,
+            strikePrice: strikePrice,
+            timeToExpiry: timeToExpiry,
+            riskFreeRate: riskFreeRate,
+            volatility: volatility
+        ) else {
+            return 0
+        }
+
+        let discountFactor = Double.exp(-terms.rate * timeToExpiry)
+        switch optionType {
+        case .call:
+            return (strikePrice * timeToExpiry * discountFactor * cumulativeNormalDistribution(terms.d2)) / 100
+        case .put:
+            return (-strikePrice * timeToExpiry * discountFactor * cumulativeNormalDistribution(-terms.d2)) / 100
+        }
+    }
+
+    static func calculateOptionGreeks(
+        spotPrice: Double,
+        strikePrice: Double,
+        timeToExpiry: Double,
+        riskFreeRate: Double,
+        volatility: Double,
+        optionType: OptionType = .call
+    ) -> OptionGreeks {
+        OptionGreeks(
+            delta: calculateOptionDelta(
+                spotPrice: spotPrice,
+                strikePrice: strikePrice,
+                timeToExpiry: timeToExpiry,
+                riskFreeRate: riskFreeRate,
+                volatility: volatility,
+                optionType: optionType
+            ),
+            gamma: calculateOptionGamma(
+                spotPrice: spotPrice,
+                strikePrice: strikePrice,
+                timeToExpiry: timeToExpiry,
+                riskFreeRate: riskFreeRate,
+                volatility: volatility
+            ),
+            theta: calculateOptionTheta(
+                spotPrice: spotPrice,
+                strikePrice: strikePrice,
+                timeToExpiry: timeToExpiry,
+                riskFreeRate: riskFreeRate,
+                volatility: volatility,
+                optionType: optionType
+            ),
+            vega: calculateOptionVega(
+                spotPrice: spotPrice,
+                strikePrice: strikePrice,
+                timeToExpiry: timeToExpiry,
+                riskFreeRate: riskFreeRate,
+                volatility: volatility
+            ),
+            rho: calculateOptionRho(
+                spotPrice: spotPrice,
+                strikePrice: strikePrice,
+                timeToExpiry: timeToExpiry,
+                riskFreeRate: riskFreeRate,
+                volatility: volatility,
+                optionType: optionType
+            )
+        )
     }
     
     // MARK: - Utility Functions
@@ -258,6 +487,35 @@ class CalculationEngine {
         let y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Double.exp(-absX * absX)
         
         return 0.5 * (1.0 + sign * y)
+    }
+
+    private static func normalDensity(_ x: Double) -> Double {
+        (1 / Double.sqrt(2 * Double.pi)) * Double.exp(-0.5 * x * x)
+    }
+
+    private static func normalizedOptionTerms(
+        spotPrice: Double,
+        strikePrice: Double,
+        timeToExpiry: Double,
+        riskFreeRate: Double,
+        volatility: Double
+    ) -> (d1: Double, d2: Double, rate: Double, sigma: Double)? {
+        guard spotPrice > 0,
+              strikePrice > 0,
+              timeToExpiry > 0,
+              volatility > 0 else {
+            return nil
+        }
+
+        let rate = riskFreeRate / 100
+        let sigma = volatility / 100
+        let denominator = sigma * Double.sqrt(timeToExpiry)
+        guard denominator > 0 else { return nil }
+
+        let d1 = (Double.log(spotPrice / strikePrice) + (rate + pow(sigma, 2) / 2) * timeToExpiry) / denominator
+        let d2 = d1 - denominator
+
+        return (d1, d2, rate, sigma)
     }
     
     enum OptionType {

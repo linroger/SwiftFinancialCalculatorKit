@@ -132,7 +132,7 @@ final class OptionsCalculation {
             optionType: optionType
         )
 
-        let delta = CalculationEngine.calculateOptionDelta(
+        let greeks = CalculationEngine.calculateOptionGreeks(
             spotPrice: spotPrice,
             strikePrice: strikePrice,
             timeToExpiry: timeToExpiry,
@@ -141,22 +141,17 @@ final class OptionsCalculation {
             optionType: optionType
         )
 
-        // Helper calculation for Gamma
-        // Gamma ≈ (Delta(S+h) - Delta(S-h)) / (2h)
-        let h = spotPrice * 0.01
-        let deltaPlus = CalculationEngine.calculateOptionDelta(spotPrice: spotPrice + h, strikePrice: strikePrice, timeToExpiry: timeToExpiry, riskFreeRate: riskFreeRate, volatility: volatility, optionType: optionType)
-        let deltaMinus = CalculationEngine.calculateOptionDelta(spotPrice: spotPrice - h, strikePrice: strikePrice, timeToExpiry: timeToExpiry, riskFreeRate: riskFreeRate, volatility: volatility, optionType: optionType)
-        let gamma = (deltaPlus - deltaMinus) / (2 * h)
-
-
         var secondaryValues: [String: Double] = [:]
         secondaryValues["Spot Price"] = spotPrice
         secondaryValues["Strike Price"] = strikePrice
         secondaryValues["Time to Expiry"] = timeToExpiry
         secondaryValues["Risk Free Rate"] = riskFreeRate
         secondaryValues["Volatility"] = volatility
-        secondaryValues["Delta"] = delta
-        secondaryValues["Gamma"] = gamma
+        secondaryValues["Delta"] = greeks.delta
+        secondaryValues["Gamma"] = greeks.gamma
+        secondaryValues["Theta"] = greeks.theta
+        secondaryValues["Vega"] = greeks.vega
+        secondaryValues["Rho"] = greeks.rho
 
         let explanation = "Theoretical price for a \(optionTypeRawValue.capitalized) option using Black-Scholes model."
 

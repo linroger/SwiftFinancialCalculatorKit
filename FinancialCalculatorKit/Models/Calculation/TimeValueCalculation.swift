@@ -165,6 +165,8 @@ final class TimeValueCalculation {
         
         if let rate = annualInterestRate {
             secondaryValues["Annual Interest Rate"] = rate
+            let effectiveAnnualRate = pow(1 + (rate / 100 / paymentFrequency.periodsPerYear), paymentFrequency.periodsPerYear) - 1
+            secondaryValues["Effective Annual Rate"] = effectiveAnnualRate * 100
         }
         
         if let years = numberOfYears {
@@ -235,8 +237,6 @@ final class TimeValueCalculation {
     
     /// Calculate the value of the variable being solved for
     private func calculateSolveForValue() -> Double {
-        // This would contain the actual financial mathematics
-        // For now, returning a placeholder calculation
         switch solveFor {
         case .presentValue:
             return calculatePresentValue()
@@ -314,7 +314,7 @@ final class TimeValueCalculation {
         
         for period in 0...periods {
             let time = paymentFrequency.yearsFromPeriods(Double(period))
-            let value = (presentValue ?? 0.0) * pow(1 + paymentFrequency.periodRate(from: rate / 100), Double(period))
+            let value = (presentValue ?? 0.0) * pow(1 + paymentFrequency.periodRate(from: rate) / 100, Double(period))
             
             data.append(ChartDataPoint(x: time, y: value, label: "Period \(period)"))
         }
