@@ -10,8 +10,9 @@ import SwiftData
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    @State private var viewModel = MainViewModel()
-    
+    /// Owned by the app so menu-bar commands can drive the same navigation state.
+    @Bindable var viewModel: MainViewModel
+
     var body: some View {
         NavigationSplitView {
             SidebarView(viewModel: viewModel)
@@ -861,6 +862,9 @@ struct FeatureCard: View {
 struct ShortcutsHelpContent: View {
     let shortcuts = [
         ("⌘ N", "New Calculation"),
+        ("⌘ 0", "Go to Dashboard"),
+        ("⌘ 1–9", "Jump to a calculator (Calculators menu)"),
+        ("⌘ ⇧ F", "Show favorites only"),
         ("⌘ ,", "Preferences"),
         ("⌘ ⇧ /", "Help"),
         ("⌘ W", "Close Window"),
@@ -975,6 +979,6 @@ struct AboutHelpContent: View {
 }
 
 #Preview {
-    ContentView()
+    ContentView(viewModel: MainViewModel())
         .modelContainer(for: FinancialCalculation.self, inMemory: true)
 }

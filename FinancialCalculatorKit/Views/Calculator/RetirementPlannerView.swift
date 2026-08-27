@@ -23,12 +23,14 @@ struct RetirementPlannerView: View {
     @State private var preRetirementReturn: Double? = 7.0
     @State private var inRetirementReturn: Double? = 4.0
     @State private var inflationRate: Double? = 2.5
+    @State private var returnVolatility: Double? = 12.0
     @State private var desiredMonthlyIncome: Double? = 5_000
     @State private var currency: Currency = .usd
 
     @State private var projection: RetirementProjection?
     @State private var validationErrors: [String] = []
     @State private var didSave: Bool = false
+    @State private var showingMonteCarlo: Bool = false
 
     var body: some View {
         ScrollView {
@@ -54,19 +56,44 @@ struct RetirementPlannerView: View {
                 .help("Save this plan")
 
                 Menu {
+                    Button("Monte Carlo Analysis", action: { showingMonteCarlo = true })
+                        .disabled(projection == nil)
+
                     Button("Export Results", action: exportResults)
                         .disabled(projection == nil)
+
                     Divider()
+
                     Button("Reset Fields", action: resetFields)
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
                 .help("More actions")
+                .accessibilityLabel("More Actions")
             }
+        }
+        .sheet(isPresented: $showingMonteCarlo) {
+            RetirementMonteCarloSheet(inputs: monteCarloInputs, currency: currency)
         }
         .onAppear {
             currency = mainViewModel.userPreferences.defaultCurrency
         }
+    }
+
+    /// Snapshot of the current inputs for the stochastic analysis.
+    private var monteCarloInputs: RetirementMonteCarloInputs {
+        RetirementMonteCarloInputs(
+            currentAge: currentAge ?? 0,
+            retirementAge: retirementAge ?? 0,
+            lifeExpectancy: lifeExpectancy ?? 0,
+            currentSavings: currentSavings ?? 0,
+            monthlyContribution: monthlyContribution ?? 0,
+            preRetirementReturn: preRetirementReturn ?? 0,
+            inRetirementReturn: inRetirementReturn ?? 0,
+            returnVolatility: returnVolatility ?? 0,
+            inflationRate: inflationRate ?? 0,
+            desiredMonthlyIncome: desiredMonthlyIncome ?? 0
+        )
     }
 
     // MARK: - Header
@@ -162,6 +189,13 @@ struct RetirementPlannerView: View {
                         helpText: "Expected annual inflation; withdrawals grow at this rate"
                     )
 
+                    PercentageInputField(
+                        title: "Return Volatility",
+                        subtitle: "Used by Monte Carlo analysis",
+                        value: $returnVolatility,
+                        helpText: "Annual standard deviation of returns. A diversified stock-heavy portfolio has run roughly 15%; a balanced portfolio closer to 10%."
+                    )
+
                     Picker("Currency", selection: $currency) {
                         ForEach(Currency.allCases) { currency in
                             Text("\(currency.displayName) (\(currency.symbol))")
@@ -204,6 +238,7 @@ struct RetirementPlannerView: View {
         .onChange(of: preRetirementReturn) { _, _ in clearResults() }
         .onChange(of: inRetirementReturn) { _, _ in clearResults() }
         .onChange(of: inflationRate) { _, _ in clearResults() }
+        .onChange(of: returnVolatility) { _, _ in clearResults() }
         .onChange(of: desiredMonthlyIncome) { _, _ in clearResults() }
         .onChange(of: currency) { _, _ in clearResults() }
     }
@@ -236,6 +271,15 @@ struct RetirementPlannerView: View {
         if let projection = projection {
             VStack(alignment: .leading, spacing: 16) {
                 projectionSummaryCard(projection)
+
+                Button(action: { showingMonteCarlo = true }) {
+                    Label("Run Monte Carlo Analysis", systemImage: "chart.line.uptrend.xyaxis")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .help("Test this plan against thousands of simulated market paths")
+
                 gapCard(projection)
                 timelineChart(projection)
             }
@@ -448,6 +492,7 @@ struct RetirementPlannerView: View {
         preRetirementReturn = 7.0
         inRetirementReturn = 4.0
         inflationRate = 2.5
+        returnVolatility = 12.0
         desiredMonthlyIncome = 5_000
         currency = mainViewModel.userPreferences.defaultCurrency
         clearResults()

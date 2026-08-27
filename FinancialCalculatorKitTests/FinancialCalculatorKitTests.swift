@@ -408,6 +408,127 @@ struct FinancialCalculatorKitTests {
         #expect(abs(rebalanced.surplus) < 1.0)
     }
 
+    // MARK: - Monte Carlo retirement analysis
+
+    /// Shared baseline: a comfortable plan used across the simulation tests.
+    private func monteCarlo(
+        volatility: Double,
+        income: Double = 4_000,
+        trials: RetirementMonteCarlo.TrialCount = .quick,
+        seed: UInt64 = 0x5EED_5EED
+    ) -> RetirementSimulationResult {
+        RetirementMonteCarlo.analyze(
+            currentAge: 40, retirementAge: 65, lifeExpectancy: 90,
+            currentSavings: 200_000, monthlyContribution: 2_000,
+            preRetirementReturn: 7, inRetirementReturn: 4,
+            returnVolatility: volatility, inflationRate: 2.5,
+            desiredMonthlyIncome: income, trials: trials, seed: seed
+        )
+    }
+
+    @Test func monteCarloIsDeterministicForAGivenSeed() async throws {
+        let first = monteCarlo(volatility: 12)
+        let second = monteCarlo(volatility: 12)
+
+        #expect(first.successProbability == second.successProbability)
+        #expect(first.medianEndingBalance == second.medianEndingBalance)
+        #expect(first.sustainableIncomeAt90 == second.sustainableIncomeAt90)
+    }
+
+    @Test func zeroVolatilityAgreesWithTheDeterministicProjection() async throws {
+        // With no volatility every path is identical, so the outcome must be
+        // all-or-nothing and must match the deterministic model's verdict.
+        let simulated = monteCarlo(volatility: 0, income: 4_000)
+        #expect(simulated.successProbability == 0 || simulated.successProbability == 1)
+
+        let deterministic = RetirementPlanCalculation.project(
+            currentAge: 40, retirementAge: 65, lifeExpectancy: 90,
+            currentSavings: 200_000, monthlyContribution: 2_000,
+            preRetirementReturn: 7, inRetirementReturn: 4, inflationRate: 2.5,
+            desiredMonthlyIncome: 4_000
+        )
+
+        let deterministicSucceeds = deterministic.depletionAge == nil
+        #expect((simulated.successProbability == 1) == deterministicSucceeds)
+    }
+
+    @Test func volatilityErodesAPlanThatHasMargin() async throws {
+        // 4,000/mo sits well inside this plan's deterministic break-even (~5,930/mo),
+        // so the only thing that can break it is sequence risk. Volatility drag bites
+        // hard here: an independent reference implementation of the same model puts
+        // calm near 98% and a 25%-volatility portfolio near 34%.
+        let calm = monteCarlo(volatility: 4, income: 4_000)
+        let stormy = monteCarlo(volatility: 25, income: 4_000)
+
+        #expect(calm.successProbability > 0.9)
+        #expect(stormy.successProbability < calm.successProbability)
+    }
+
+    @Test func volatilityIsTheOnlyHopeForAPlanThatCannotWork() async throws {
+        // The mirror image: when the deterministic plan fails outright, success
+        // requires luck, so dispersion can only help. This is why a low success
+        // probability must be read alongside the deterministic gap, not instead of it.
+        let calm = monteCarlo(volatility: 2, income: 12_000)
+        let stormy = monteCarlo(volatility: 25, income: 12_000)
+
+        #expect(calm.successProbability == 0)
+        #expect(stormy.successProbability >= calm.successProbability)
+    }
+
+    @Test func successProbabilityAndPercentilesStayWellFormed() async throws {
+        let result = monteCarlo(volatility: 15)
+
+        #expect(result.successProbability >= 0 && result.successProbability <= 1)
+        #expect(result.p10EndingBalance <= result.medianEndingBalance)
+        #expect(result.medianEndingBalance <= result.p90EndingBalance)
+        #expect(result.sustainableIncomeAt90 >= 0)
+        #expect(!result.percentileBands.isEmpty)
+
+        // Bands must be ordered within every year and span the whole horizon
+        for band in result.percentileBands {
+            #expect(band.p10 <= band.p50)
+            #expect(band.p50 <= band.p90)
+        }
+        #expect(abs((result.percentileBands.first?.age ?? 0) - 40) < 0.001)
+        #expect((result.percentileBands.last?.age ?? 0) >= 89)
+    }
+
+    @Test func sustainableIncomeClearsNinetyPercentConfidence() async throws {
+        let result = monteCarlo(volatility: 12, income: 12_000)
+
+        // The asked-for income is unaffordable here, so the solver must land lower
+        #expect(result.successProbability < 0.9)
+        #expect(result.sustainableIncomeAt90 < 12_000)
+
+        // Re-running at the solved income should actually clear the bar
+        let verified = monteCarlo(volatility: 12, income: result.sustainableIncomeAt90)
+        #expect(verified.successProbability >= 0.85)
+    }
+
+    @Test func percentileInterpolatesBetweenSamples() async throws {
+        let sorted = [0.0, 10.0, 20.0, 30.0, 40.0]
+        #expect(RetirementMonteCarlo.percentile(sorted, 0) == 0)
+        #expect(RetirementMonteCarlo.percentile(sorted, 1) == 40)
+        #expect(RetirementMonteCarlo.percentile(sorted, 0.5) == 20)
+        #expect(abs(RetirementMonteCarlo.percentile(sorted, 0.25) - 10) < 1e-9)
+        #expect(RetirementMonteCarlo.percentile([], 0.5) == 0)
+        #expect(RetirementMonteCarlo.percentile([7], 0.9) == 7)
+    }
+
+    @Test func seededGeneratorProducesAStableNormalDistribution() async throws {
+        var sampler = NormalSampler(seed: 42)
+        var samples: [Double] = []
+        for _ in 0..<20_000 {
+            samples.append(sampler.nextNormal())
+        }
+
+        let mean = samples.reduce(0, +) / Double(samples.count)
+        let variance = samples.map { pow($0 - mean, 2) }.reduce(0, +) / Double(samples.count - 1)
+
+        #expect(abs(mean) < 0.05)
+        #expect(abs(variance - 1) < 0.05)
+    }
+
     // MARK: - Unit conversion
 
     @Test func temperatureConversionsMatchKnownPoints() async throws {

@@ -3,6 +3,7 @@
   "prompts": [
     "study this app's codebase and repair all errors and improve it and optimize it and make sure all features and functions work as expected.",
     "/login",
-    "keep iterating and refining and improving until everything from the ui to the functions are absolutely perfect. when you are done, push to git"
+    "keep iterating and refining and improving until everything from the ui to the functions are absolutely perfect. when you are done, push to git",
+    "/loop keep iterating and improving and perfecting the ui andfeatures and functionalities, and keep adding new and novel and high\n  value and additive features"
   ]
 }

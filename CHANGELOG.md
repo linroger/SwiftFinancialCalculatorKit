@@ -2,6 +2,17 @@
 
 All notable changes to FinancialCalculatorKit will be documented in this file.
 
+## [0.4.0] - 2026-08-28
+
+### Added
+- **Monte Carlo retirement analysis**: simulates up to 10,000 market paths to report the probability a plan actually funds its income for life, a percentile fan chart of balances over time, the pessimistic/median/optimistic ending balance, the median age money runs out on failed paths, and the income level the plan sustains at 90% confidence. This captures sequence-of-returns risk, which a single deterministic projection cannot show. Runs off the main thread with a real progress indicator, and is reproducible — a seeded generator means the same plan always yields the same numbers.
+- **Return volatility** input in the Retirement Planner, feeding the simulation
+- **Menu-bar commands**: a Calculators menu with ⌘0 for the dashboard, ⌘1–⌘9 to jump to each calculator, ⌘⇧F to filter favorites, plus ⌘N and ⌘⇧/ — the keyboard shortcuts the help screen documents are now real
+- 7 tests covering the simulation: seeded determinism, agreement with the deterministic projection at zero volatility, the direction volatility pushes confidence in both a funded and an unfundable plan, percentile interpolation, band ordering, and the sampler's distribution (mean/variance within 0.05 over 20k draws)
+
+### Notes
+- Cross-checked the simulation against an independent reference implementation: both put this baseline plan's deterministic break-even at ~5,930/month and agree on success rates across volatility levels
+
 ## [0.3.0] - 2026-08-28
 
 ### Added
