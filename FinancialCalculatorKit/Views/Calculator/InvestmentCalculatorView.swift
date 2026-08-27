@@ -21,7 +21,6 @@ struct InvestmentCalculatorView: View {
     @State private var analysisType: InvestmentAnalysisType = .both
     @State private var currency: Currency = .usd
 
-    @State private var isCalculating: Bool = false
     @State private var calculationResult: CalculationResult?
     @State private var validationErrors: [String] = []
     @State private var showingSensitivityAnalysis: Bool = false
@@ -134,10 +133,7 @@ struct InvestmentCalculatorView: View {
                 Spacer()
                 
                 VStack(alignment: .trailing, spacing: 4) {
-                    if isCalculating {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                    } else if calculationResult?.isValid == true {
+                    if calculationResult?.isValid == true {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundColor(.green)
                     }
@@ -583,9 +579,8 @@ struct InvestmentCalculatorView: View {
             return
         }
         
-        isCalculating = true
         validationErrors = []
-        
+
         // Create temporary calculation object
         let tempCalculation = InvestmentCalculation(
             name: calculationName,
@@ -597,13 +592,10 @@ struct InvestmentCalculatorView: View {
         )
         
         // Perform calculation
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            calculationResult = tempCalculation.result
-            isCalculating = false
-            
-            if calculationResult?.isValid != true {
-                validationErrors = tempCalculation.validationErrors
-            }
+        calculationResult = tempCalculation.result
+
+        if calculationResult?.isValid != true {
+            validationErrors = tempCalculation.validationErrors
         }
     }
     

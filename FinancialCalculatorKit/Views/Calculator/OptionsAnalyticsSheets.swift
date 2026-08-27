@@ -255,7 +255,7 @@ struct VolatilitySurfaceView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Volatility Surface")
+            .navigationTitle("Skew Scenario")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {

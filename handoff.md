@@ -1,8 +1,8 @@
 # Handoff.md
 
-**Last Updated (UTC):** 2026-08-27 21:20 UTC
-**Status:** In Progress
-**Current Focus:** Core repair pass complete — engine math, persistence, honesty, and crash fixes are in with a green build and 25 passing unit tests. Remaining: currency/unit converter runtime verification, README refresh, and the new planning tool.
+**Last Updated (UTC):** 2026-08-27 22:15 UTC
+**Status:** Complete
+**Current Focus:** All 15 features in feature_list.json pass. Two full repair passes are done: the engine/persistence/honesty pass, then an exhaustive re-audit that confirmed and fixed 36 further defects and delivered the Retirement Planner. Build clean, 35/35 unit tests green, app launches with the migrated 10-model schema, and the work is pushed to GitHub (grafted onto the existing linroger/SwiftFinancialCalculatorKit history).
 
 ## 1) Request & Context
 - **User’s request (quoted or paraphrased):** Read the macOS app codebase recursively, understand every Swift file, map how the app fits together, then drive the app from its current broken and incomplete state toward a complete, polished, shippable macOS release with improved UI, fixed bugs, additional calculations, updated README, and a pushed GitHub state.
@@ -107,6 +107,7 @@
   3. Add scenario tests for those shared flows before moving into calculator-specific math audits.
 
 ## 10) Updates to This File (append-only)
+- 2026-08-27 22:15 UTC: Marked Complete. Second pass: a 7-lens re-audit produced 55 candidate findings, 36 adversarially confirmed, all fixed (pagination crash, typing-hostile bindings, stale-result delays, no-solution gating, IRR interior roots, analytics horizon truncation, Int-trap clamps, stale exchange-rate races, picker/label/accessibility polish). Added the Retirement Planner end to end (model + view + schema + navigation + recents + dashboard + docs) with 4 math tests. 35/35 tests green; 15/15 features passing; pushed to GitHub preserving remote history.
 - 2026-08-27 21:30 UTC: Recorded the full audit-and-repair pass (engine math, persistence, honesty, crash guards, pbxproj repair), evidence (green build, 25/25 unit tests including textbook-value checks), the new isolated git repository, the Xcode-beta/`-skipMacroValidation` environment requirement, and the UI-testing authorization limitation of headless sessions. Remaining: converter runtime verification, interactive export check, new planning tool.
 - 2026-04-13 20:09:17 UTC: Created initial handoff with architecture findings, build evidence, major risks, and the first stabilization roadmap.
 - 2026-04-13 20:09:17 UTC: Updated handoff after creating the harness, validating `init.sh`, reading the main calculator surfaces, and discovering that `build_and_run.sh --verify` fails because of a polluted Xcode project source graph.

@@ -535,30 +535,35 @@ struct PreferencesView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Currency") {
+                Section("Defaults for New Calculations") {
                     Picker("Default Currency", selection: $viewModel.userPreferences.defaultCurrency) {
                         ForEach(Currency.allCases) { currency in
                             Text("\(currency.displayName) (\(currency.symbol))")
                                 .tag(currency)
                         }
                     }
+
+                    Picker("Default Payment Frequency", selection: $viewModel.userPreferences.defaultPaymentFrequency) {
+                        ForEach(PaymentFrequency.allCases) { frequency in
+                            Text(frequency.displayName)
+                                .tag(frequency)
+                        }
+                    }
                 }
-                
-                Section("Formatting") {
-                    Stepper("Decimal Places: \(viewModel.userPreferences.decimalPlaces)", 
-                           value: $viewModel.userPreferences.decimalPlaces, 
+
+                Section {
+                    Stepper("Decimal Places: \(viewModel.userPreferences.decimalPlaces)",
+                           value: $viewModel.userPreferences.decimalPlaces,
                            in: 0...6)
-                    
-                    Toggle("Use Thousands Separator", 
+
+                    Toggle("Use Thousands Separator",
                            isOn: $viewModel.userPreferences.useThousandsSeparator)
-                }
-                
-                Section("Interface") {
-                    Toggle("Show Tooltips", 
-                           isOn: $viewModel.userPreferences.showTooltips)
-                    
-                    Toggle("Auto-save Calculations", 
-                           isOn: $viewModel.userPreferences.autoSaveCalculations)
+                } header: {
+                    Text("Number Formatting")
+                } footer: {
+                    Text("Applies to all displayed currency amounts.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
             }
             .navigationTitle("Preferences")

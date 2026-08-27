@@ -164,11 +164,28 @@ enum Currency: String, CaseIterable, Identifiable, Codable {
         return cache
     }()
 
-    /// Format a value with the currency symbol and appropriate decimal places
+    /// Format a value with the currency symbol, honoring the user's number-format
+    /// preferences (decimal places, thousands separator) when they diverge from
+    /// this currency's defaults.
     func formatValue(_ value: Double) -> String {
-        guard let formatter = Currency.formatterCache[self] else {
-            return "\(symbol)\(value)"
+        let defaults = UserDefaults.standard
+        let overridePlaces = defaults.object(forKey: PreferenceKeys.decimalPlaces) as? Int
+        let grouping = defaults.object(forKey: PreferenceKeys.useThousandsSeparator) as? Bool ?? true
+
+        let places = min(max(overridePlaces ?? decimalPlaces, 0), 6)
+
+        // Fast path: the cached formatter already matches the effective settings
+        if places == decimalPlaces && grouping,
+           let formatter = Currency.formatterCache[self] {
+            return formatter.string(from: NSNumber(value: value)) ?? "\(symbol)\(value)"
         }
+
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = rawValue
+        formatter.maximumFractionDigits = places
+        formatter.minimumFractionDigits = places
+        formatter.usesGroupingSeparator = grouping
         return formatter.string(from: NSNumber(value: value)) ?? "\(symbol)\(value)"
     }
 }

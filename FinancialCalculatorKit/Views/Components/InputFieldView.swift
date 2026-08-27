@@ -240,35 +240,35 @@ struct ValidationRule: Sendable {
         guard !value.isEmpty else {
             return InputValidationResult(isValid: false, errorMessage: "This field is required")
         }
-        
-        guard let number = Double(value), number > 0 else {
+
+        guard let number = parseUserNumber(value), number > 0 else {
             return InputValidationResult(isValid: false, errorMessage: "Must be a positive number")
         }
-        
+
         return InputValidationResult(isValid: true, errorMessage: nil)
     }
-    
+
     static let nonNegativeNumber = ValidationRule { value in
         guard !value.isEmpty else {
             return InputValidationResult(isValid: false, errorMessage: "This field is required")
         }
-        
-        guard let number = Double(value), number >= 0 else {
+
+        guard let number = parseUserNumber(value), number >= 0 else {
             return InputValidationResult(isValid: false, errorMessage: "Must be zero or positive")
         }
-        
+
         return InputValidationResult(isValid: true, errorMessage: nil)
     }
-    
+
     static let percentage = ValidationRule { value in
         guard !value.isEmpty else {
             return InputValidationResult(isValid: false, errorMessage: "This field is required")
         }
-        
-        guard let number = Double(value), number >= 0, number <= 100 else {
+
+        guard let number = parseUserNumber(value), number >= 0, number <= 100 else {
             return InputValidationResult(isValid: false, errorMessage: "Must be between 0 and 100")
         }
-        
+
         return InputValidationResult(isValid: true, errorMessage: nil)
     }
     

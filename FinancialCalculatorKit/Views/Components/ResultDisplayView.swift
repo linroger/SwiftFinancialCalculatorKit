@@ -254,31 +254,6 @@ struct ErrorResultView: View {
     }
 }
 
-/// Loading result display
-struct LoadingResultView: View {
-    var body: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .progressViewStyle(CircularProgressViewStyle(tint: .accentColor))
-                .scaleEffect(1.2)
-            
-            Text("Calculating...")
-                .font(.headline)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 48)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(NSColor.controlBackgroundColor))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color(NSColor.separatorColor), lineWidth: 1)
-                )
-        )
-    }
-}
-
 #Preview {
     ScrollView {
         VStack(spacing: 20) {
@@ -305,8 +280,6 @@ struct LoadingResultView: View {
                     "Verify that percentages are between 0 and 100"
                 ]
             )
-            
-            LoadingResultView()
         }
         .padding()
     }

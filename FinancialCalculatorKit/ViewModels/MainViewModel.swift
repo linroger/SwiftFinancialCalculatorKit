@@ -32,9 +32,6 @@ class MainViewModel {
     /// Show favorites only
     var showFavoritesOnly: Bool = false
     
-    /// Current navigation path for detail views
-    var navigationPath = NavigationPath()
-    
     /// User preferences
     var userPreferences: UserPreferences = UserPreferences()
     
@@ -42,14 +39,8 @@ class MainViewModel {
     var currentError: FinancialCalculatorError?
     var showingError: Bool = false
     
-    /// Loading states
-    var isCalculating: Bool = false
-    var isLoadingData: Bool = false
-    
     /// Sheet presentation state
     var presentedSheet: PresentedSheet?
-    var showingImportSheet: Bool = false
-    var showingExportSheet: Bool = false
     
     /// Initialize with default settings
     init() {
@@ -159,104 +150,55 @@ class MainViewModel {
     }
 }
 
-/// User preferences model
+/// UserDefaults keys shared between the preferences model and the currency
+/// formatter, which honors the number-format settings app-wide.
+enum PreferenceKeys {
+    static let defaultCurrency = "preferences.defaultCurrency"
+    static let defaultPaymentFrequency = "preferences.defaultPaymentFrequency"
+    static let decimalPlaces = "preferences.decimalPlaces"
+    static let useThousandsSeparator = "preferences.useThousandsSeparator"
+}
+
+/// User preferences model. Every property here is consumed somewhere in the
+/// app — settings that would have no effect are not offered.
 @Observable
 class UserPreferences {
     /// Default currency for new calculations
     var defaultCurrency: Currency = .usd
-    
-    /// Default payment frequency
+
+    /// Default payment frequency for new calculations
     var defaultPaymentFrequency: PaymentFrequency = .monthly
-    
-    /// Number format preferences
+
+    /// Number format preferences, honored by Currency.formatValue
     var decimalPlaces: Int = 2
     var useThousandsSeparator: Bool = true
-    
-    /// Chart preferences
-    var defaultChartType: ChartType = .line
-    var showDataLabels: Bool = true
-    
-    /// UI preferences
-    var sidebarWidth: Double = 250
-    var showTooltips: Bool = true
-    var autoSaveCalculations: Bool = true
-    
-    /// Export preferences
-    var defaultExportFormat: ExportFormat = .csv
-    var includeChartsInExport: Bool = true
-
-    // MARK: - Persistence
-
-    private enum Keys {
-        static let defaultCurrency = "preferences.defaultCurrency"
-        static let defaultPaymentFrequency = "preferences.defaultPaymentFrequency"
-        static let decimalPlaces = "preferences.decimalPlaces"
-        static let useThousandsSeparator = "preferences.useThousandsSeparator"
-        static let defaultChartType = "preferences.defaultChartType"
-        static let showDataLabels = "preferences.showDataLabels"
-        static let sidebarWidth = "preferences.sidebarWidth"
-        static let showTooltips = "preferences.showTooltips"
-        static let autoSaveCalculations = "preferences.autoSaveCalculations"
-        static let defaultExportFormat = "preferences.defaultExportFormat"
-        static let includeChartsInExport = "preferences.includeChartsInExport"
-    }
 
     /// Load preferences from UserDefaults, falling back to defaults for missing keys.
     static func load(from defaults: UserDefaults = .standard) -> UserPreferences {
         let preferences = UserPreferences()
-        if let raw = defaults.string(forKey: Keys.defaultCurrency),
+        if let raw = defaults.string(forKey: PreferenceKeys.defaultCurrency),
            let currency = Currency(rawValue: raw) {
             preferences.defaultCurrency = currency
         }
-        if let raw = defaults.string(forKey: Keys.defaultPaymentFrequency),
+        if let raw = defaults.string(forKey: PreferenceKeys.defaultPaymentFrequency),
            let frequency = PaymentFrequency(rawValue: raw) {
             preferences.defaultPaymentFrequency = frequency
         }
-        if defaults.object(forKey: Keys.decimalPlaces) != nil {
-            preferences.decimalPlaces = min(max(defaults.integer(forKey: Keys.decimalPlaces), 0), 6)
+        if defaults.object(forKey: PreferenceKeys.decimalPlaces) != nil {
+            preferences.decimalPlaces = min(max(defaults.integer(forKey: PreferenceKeys.decimalPlaces), 0), 6)
         }
-        if defaults.object(forKey: Keys.useThousandsSeparator) != nil {
-            preferences.useThousandsSeparator = defaults.bool(forKey: Keys.useThousandsSeparator)
-        }
-        if let raw = defaults.string(forKey: Keys.defaultChartType),
-           let chartType = ChartType(rawValue: raw) {
-            preferences.defaultChartType = chartType
-        }
-        if defaults.object(forKey: Keys.showDataLabels) != nil {
-            preferences.showDataLabels = defaults.bool(forKey: Keys.showDataLabels)
-        }
-        if defaults.object(forKey: Keys.sidebarWidth) != nil {
-            preferences.sidebarWidth = defaults.double(forKey: Keys.sidebarWidth)
-        }
-        if defaults.object(forKey: Keys.showTooltips) != nil {
-            preferences.showTooltips = defaults.bool(forKey: Keys.showTooltips)
-        }
-        if defaults.object(forKey: Keys.autoSaveCalculations) != nil {
-            preferences.autoSaveCalculations = defaults.bool(forKey: Keys.autoSaveCalculations)
-        }
-        if let raw = defaults.string(forKey: Keys.defaultExportFormat),
-           let format = ExportFormat(rawValue: raw) {
-            preferences.defaultExportFormat = format
-        }
-        if defaults.object(forKey: Keys.includeChartsInExport) != nil {
-            preferences.includeChartsInExport = defaults.bool(forKey: Keys.includeChartsInExport)
+        if defaults.object(forKey: PreferenceKeys.useThousandsSeparator) != nil {
+            preferences.useThousandsSeparator = defaults.bool(forKey: PreferenceKeys.useThousandsSeparator)
         }
         return preferences
     }
 
     /// Persist preferences to UserDefaults.
     func save(to defaults: UserDefaults = .standard) {
-        defaults.set(defaultCurrency.rawValue, forKey: Keys.defaultCurrency)
-        defaults.set(defaultPaymentFrequency.rawValue, forKey: Keys.defaultPaymentFrequency)
-        defaults.set(decimalPlaces, forKey: Keys.decimalPlaces)
-        defaults.set(useThousandsSeparator, forKey: Keys.useThousandsSeparator)
-        defaults.set(defaultChartType.rawValue, forKey: Keys.defaultChartType)
-        defaults.set(showDataLabels, forKey: Keys.showDataLabels)
-        defaults.set(sidebarWidth, forKey: Keys.sidebarWidth)
-        defaults.set(showTooltips, forKey: Keys.showTooltips)
-        defaults.set(autoSaveCalculations, forKey: Keys.autoSaveCalculations)
-        defaults.set(defaultExportFormat.rawValue, forKey: Keys.defaultExportFormat)
-        defaults.set(includeChartsInExport, forKey: Keys.includeChartsInExport)
+        defaults.set(defaultCurrency.rawValue, forKey: PreferenceKeys.defaultCurrency)
+        defaults.set(defaultPaymentFrequency.rawValue, forKey: PreferenceKeys.defaultPaymentFrequency)
+        defaults.set(decimalPlaces, forKey: PreferenceKeys.decimalPlaces)
+        defaults.set(useThousandsSeparator, forKey: PreferenceKeys.useThousandsSeparator)
     }
 }
 
@@ -276,42 +218,6 @@ enum ChartType: String, CaseIterable, Identifiable {
             return "Bar Chart"
         case .area:
             return "Area Chart"
-        }
-    }
-}
-
-/// Export format options
-enum ExportFormat: String, CaseIterable, Identifiable {
-    case csv = "csv"
-    case excel = "excel"
-    case pdf = "pdf"
-    case json = "json"
-    
-    var id: String { rawValue }
-    
-    var displayName: String {
-        switch self {
-        case .csv:
-            return "CSV"
-        case .excel:
-            return "Excel"
-        case .pdf:
-            return "PDF"
-        case .json:
-            return "JSON"
-        }
-    }
-    
-    var fileExtension: String {
-        switch self {
-        case .csv:
-            return "csv"
-        case .excel:
-            return "xlsx"
-        case .pdf:
-            return "pdf"
-        case .json:
-            return "json"
         }
     }
 }
