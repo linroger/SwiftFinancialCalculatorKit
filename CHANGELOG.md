@@ -2,6 +2,35 @@
 
 All notable changes to FinancialCalculatorKit will be documented in this file.
 
+## [0.3.0] - 2026-08-28
+
+### Added
+- **Retirement Planner**: accumulation projection, growing-annuity required nest egg, sustainable income in today's dollars, additional-savings-needed gap analysis, depletion-age simulation, and a balance-over-time chart — wired into navigation, persistence, sidebar recents, dashboard, help, and README
+- Loan balance-over-time chart rendered from the real amortization schedule
+- CSV export for Time Value and Options calculators (every calculator can now export)
+- Default payment frequency is now settable in Preferences
+- Regression tests: retirement math (closed-form vs brute-force), temperature fixed points, CSV escaping, SwiftData round-trip — 36 tests total
+
+### Fixed
+- Amortization table crashed when searching while on page 2+ of a long schedule
+- Loan Term and Number of Years fields fought the user while typing ("30" snapped to "3.0")
+- Leftover artificial calculation delays could resurrect stale results after inputs changed; all calculations are now synchronous and every input edit invalidates the displayed result
+- Down payment silently carried into standard-loan math after switching from Mortgage
+- Bond "No solution" results no longer enable analytics computed at a fabricated 0% yield, and insights no longer describe a YTM that does not exist
+- IRR now finds roots of non-conventional cash flows (interior bracket scan); "No IRR found" is no longer treated as a real 0% IRR by the insights
+- TVM analytics no longer silently truncate horizons beyond 1200 periods — the full plan is simulated and the chart is down-sampled instead
+- Extreme numeric inputs can no longer trap Int conversions (input caps: years ≤ 1000, loan term ≤ 100)
+- Currency converter: switching the base currency can no longer show or save the old base's rate relabeled as the new pair (in-flight fetches are cancelled and stale responses discarded); the view starts in an honest "rate unavailable" state instead of a fabricated 1.0; amounts use per-currency formatting (no phantom yen decimals)
+- Currency pickers in every calculator show all 16 currencies, so a saved default like KRW can no longer render a blank selection
+- MACRS reports the full cost basis as the depreciable base (salvage is ignored by convention) and salvage is clamped strictly below asset cost
+- Payback period now also appears in combined NPV & IRR mode; the sensitivity sheet computes the real NPV instead of relabeling an IRR percentage as dollars
+- Duration/convexity include the fractional trailing coupon; VaR returns the conventional positive loss
+- Duplicate field labels and doubled help icons removed; icon-only toolbar menus have tooltips and accessibility labels; unit-category picker no longer truncates
+
+### Changed
+- Preferences panel now contains only settings that actually do something; decimal-places and thousands-separator preferences are honored by all currency formatting
+- Removed dead spinner states, unused view-model fields, and the unused LoadingResultView/ExportFormat code
+
 ## [0.2.0] - 2026-08-28
 
 ### Fixed

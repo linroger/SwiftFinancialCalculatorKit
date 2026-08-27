@@ -290,7 +290,6 @@ struct RetirementPlannerView: View {
             .padding(.vertical, 12)
         }
         .groupBoxStyle(FinancialGroupBoxStyle())
-
     }
 
     private func gapCard(_ projection: RetirementProjection) -> some View {
