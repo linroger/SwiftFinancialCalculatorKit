@@ -7,6 +7,7 @@
 
 import Testing
 import Foundation
+import SwiftData
 @testable import FinancialCalculatorKit
 
 struct FinancialCalculatorKitTests {
@@ -325,6 +326,163 @@ struct FinancialCalculatorKitTests {
     @Test func expressionWithUnknownVariableFails() async throws {
         let value = CalculationEngine.evaluateExpression("x + 1", with: [:])
         #expect(value == nil)
+    }
+
+    // MARK: - Retirement planning
+
+    @Test func growingAnnuityPVMatchesBruteForceSum() async throws {
+        let firstPayment = 1_000.0
+        let r = 0.005
+        let g = 0.002
+        let n = 360
+
+        let closedForm = RetirementPlanCalculation.growingAnnuityPresentValue(
+            firstPayment: firstPayment, ratePerPeriod: r, growthPerPeriod: g, periods: n
+        )
+
+        var bruteForce = 0.0
+        for k in 1...n {
+            bruteForce += firstPayment * pow(1 + g, Double(k - 1)) / pow(1 + r, Double(k))
+        }
+
+        #expect(abs(closedForm - bruteForce) < 0.01)
+
+        // Degenerate r == g case
+        let equal = RetirementPlanCalculation.growingAnnuityPresentValue(
+            firstPayment: 100, ratePerPeriod: 0.004, growthPerPeriod: 0.004, periods: 24
+        )
+        var equalSum = 0.0
+        for k in 1...24 {
+            equalSum += 100 * pow(1.004, Double(k - 1)) / pow(1.004, Double(k))
+        }
+        #expect(abs(equal - equalSum) < 1e-9)
+    }
+
+    @Test func retirementProjectionZeroRateSanity() async throws {
+        // All rates zero: pure arithmetic
+        let projection = RetirementPlanCalculation.project(
+            currentAge: 60, retirementAge: 61, lifeExpectancy: 62,
+            currentSavings: 1_200, monthlyContribution: 100,
+            preRetirementReturn: 0, inRetirementReturn: 0, inflationRate: 0,
+            desiredMonthlyIncome: 100
+        )
+
+        #expect(abs(projection.projectedNestEgg - 2_400) < 1e-9)
+        #expect(abs(projection.requiredNestEgg - 1_200) < 1e-9)
+        #expect(abs(projection.surplus - 1_200) < 1e-9)
+        #expect(abs(projection.sustainableMonthlyIncomeToday - 200) < 1e-9)
+        #expect(projection.depletionAge == nil)
+    }
+
+    @Test func retirementShortfallReportsDepletionAndExtraSavings() async throws {
+        let projection = RetirementPlanCalculation.project(
+            currentAge: 60, retirementAge: 61, lifeExpectancy: 62,
+            currentSavings: 0, monthlyContribution: 0,
+            preRetirementReturn: 0, inRetirementReturn: 0, inflationRate: 0,
+            desiredMonthlyIncome: 1_000
+        )
+
+        #expect(projection.surplus < 0)
+        #expect(abs(projection.additionalMonthlySavingsNeeded - 1_000) < 1e-9)
+        #expect(projection.depletionAge != nil)
+        #expect(abs((projection.depletionAge ?? 0) - (61 + 1.0 / 12)) < 0.001)
+    }
+
+    @Test func sustainableIncomeIsSelfConsistent() async throws {
+        // Feeding the sustainable income back in as the desired income should
+        // land the plan almost exactly at break-even
+        let base = RetirementPlanCalculation.project(
+            currentAge: 40, retirementAge: 65, lifeExpectancy: 90,
+            currentSavings: 100_000, monthlyContribution: 1_500,
+            preRetirementReturn: 6, inRetirementReturn: 4, inflationRate: 2.5,
+            desiredMonthlyIncome: 6_000
+        )
+
+        let rebalanced = RetirementPlanCalculation.project(
+            currentAge: 40, retirementAge: 65, lifeExpectancy: 90,
+            currentSavings: 100_000, monthlyContribution: 1_500,
+            preRetirementReturn: 6, inRetirementReturn: 4, inflationRate: 2.5,
+            desiredMonthlyIncome: base.sustainableMonthlyIncomeToday
+        )
+
+        #expect(abs(rebalanced.surplus) < 1.0)
+    }
+
+    // MARK: - Unit conversion
+
+    @Test func temperatureConversionsMatchKnownPoints() async throws {
+        #expect(abs((UnitConverterView.convertTemperature(100, from: "°C", to: "°F") ?? 0) - 212) < 1e-9)
+        #expect(abs((UnitConverterView.convertTemperature(32, from: "°F", to: "°C") ?? 1) - 0) < 1e-9)
+        #expect(abs((UnitConverterView.convertTemperature(0, from: "°C", to: "K") ?? 0) - 273.15) < 1e-9)
+        #expect(abs((UnitConverterView.convertTemperature(0, from: "°C", to: "°R") ?? 0) - 491.67) < 1e-9)
+        #expect(UnitConverterView.convertTemperature(1, from: "°X", to: "°C") == nil)
+    }
+
+    // MARK: - CSV export
+
+    @Test @MainActor func csvGenerationEscapesAndOrdersColumns() async throws {
+        let csv = CalculationExporter.csvString(
+            headers: ["Item", "Value"],
+            rows: [
+                ["Item": "Total, gross", "Value": "1,798.65"],
+                ["Item": "Say \"hi\"", "Value": "2"],
+            ]
+        )
+        let lines = csv.split(separator: "\n")
+        #expect(lines[0] == "Item,Value")
+        #expect(lines[1] == "\"Total, gross\",\"1,798.65\"")
+        #expect(lines[2] == "\"Say \"\"hi\"\"\",2")
+    }
+
+    // MARK: - SwiftData persistence
+
+    @Test @MainActor func modelsRoundTripThroughSwiftDataStore() async throws {
+        let schema = Schema([
+            FinancialCalculation.self,
+            TimeValueCalculation.self,
+            LoanCalculation.self,
+            BondCalculation.self,
+            InvestmentCalculation.self,
+            DepreciationCalculation.self,
+            OptionsCalculation.self,
+            MathExpressionCalculation.self,
+            CurrencyConversionCalculation.self,
+            RetirementPlanCalculation.self
+        ])
+        let container = try ModelContainer(
+            for: schema,
+            configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)]
+        )
+        let context = ModelContext(container)
+
+        let loan = LoanCalculation(
+            name: "Persisted Loan", principalAmount: 250_000,
+            annualInterestRate: 5.5, loanTermYears: 15
+        )
+        let plan = RetirementPlanCalculation(
+            name: "Persisted Plan", currentAge: 40, retirementAge: 65, lifeExpectancy: 90,
+            currentSavings: 10_000, monthlyContribution: 500,
+            preRetirementReturn: 6, inRetirementReturn: 4, inflationRate: 2.5,
+            desiredMonthlyIncome: 4_000
+        )
+        context.insert(loan)
+        context.insert(plan)
+        try context.save()
+
+        // Favorite round-trip
+        plan.toggleFavorite()
+        try context.save()
+
+        let plans = try context.fetch(FetchDescriptor<RetirementPlanCalculation>())
+        #expect(plans.count == 1)
+        #expect(plans.first?.isFavorite == true)
+        #expect(plans.first?.calculationType == .retirement)
+
+        // Delete round-trip
+        context.delete(loan)
+        try context.save()
+        let loans = try context.fetch(FetchDescriptor<LoanCalculation>())
+        #expect(loans.isEmpty)
     }
 
     // MARK: - Preferences persistence

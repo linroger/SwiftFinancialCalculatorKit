@@ -34,7 +34,8 @@ struct FinancialCalculatorKitApp: App {
             DepreciationCalculation.self,
             OptionsCalculation.self,
             MathExpressionCalculation.self,
-            CurrencyConversionCalculation.self
+            CurrencyConversionCalculation.self,
+            RetirementPlanCalculation.self
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

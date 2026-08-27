@@ -18,13 +18,13 @@ struct LoanCalculatorView: View {
     @State private var principalAmount: Double? = nil
     @State private var annualInterestRate: Double? = nil
     @State private var loanTermYears: Double? = nil
+    @State private var loanTermText: String = ""
     @State private var downPayment: Double? = nil
     @State private var extraPayment: Double? = nil
     @State private var paymentFrequency: PaymentFrequency = .monthly
     @State private var loanType: LoanType = .standardLoan
     @State private var currency: Currency = .usd
-    
-    @State private var isCalculating: Bool = false
+
     @State private var calculationResult: CalculationResult?
     @State private var validationErrors: [String] = []
     @State private var showAmortizationTable: Bool = false
@@ -87,11 +87,21 @@ struct LoanCalculatorView: View {
         }
         .onChange(of: principalAmount) { clearResults() }
         .onChange(of: annualInterestRate) { clearResults() }
-        .onChange(of: loanTermYears) { clearResults() }
+        .onChange(of: loanTermText) {
+            loanTermYears = parseUserNumber(loanTermText)
+            clearResults()
+        }
         .onChange(of: downPayment) { clearResults() }
         .onChange(of: extraPayment) { clearResults() }
         .onChange(of: paymentFrequency) { clearResults() }
-        .onChange(of: loanType) { clearResults() }
+        .onChange(of: loanType) {
+            // The down-payment field is only visible for mortgages; drop its
+            // value when leaving that mode so it can't silently affect results
+            if loanType != .mortgage {
+                downPayment = nil
+            }
+            clearResults()
+        }
         .onChange(of: currency) { clearResults() }
     }
     
@@ -129,7 +139,7 @@ struct LoanCalculatorView: View {
                             .foregroundColor(.secondary)
                         
                         Picker("Currency", selection: $currency) {
-                            ForEach(Currency.allCases.prefix(8)) { curr in
+                            ForEach(Currency.allCases) { curr in
                                 Text("\(curr.symbol) \(curr.rawValue)")
                                     .tag(curr)
                             }
@@ -190,10 +200,7 @@ struct LoanCalculatorView: View {
                     InputFieldView(
                         title: "Loan Term",
                         subtitle: "Repayment period in years",
-                        value: Binding(
-                            get: { loanTermYears?.description ?? "" },
-                            set: { loanTermYears = Double($0) }
-                        ),
+                        value: $loanTermText,
                         placeholder: isMortgage ? "30" : "5",
                         keyboardType: .decimalPad,
                         validation: .positiveNumber,
@@ -227,17 +234,25 @@ struct LoanCalculatorView: View {
     @ViewBuilder
     private var resultSection: some View {
         VStack(spacing: 20) {
-            if isCalculating {
-                LoadingResultView()
-            } else if let result = calculationResult {
+            if let result = calculationResult {
                 ResultDisplayView(
                     result: result,
                     currency: currency
                 )
-                
+
                 // Quick summary cards
                 quickSummaryCards
-                
+
+                // Remaining balance over the life of the loan
+                if let chartData = result.chartData, !chartData.isEmpty {
+                    FinancialChartView(
+                        data: chartData,
+                        chartType: .area,
+                        title: "Remaining Balance",
+                        currency: currency,
+                        height: 220
+                    )
+                }
             } else {
                 placeholderResultView
             }
@@ -329,26 +344,32 @@ struct LoanCalculatorView: View {
     }
     
     private var canCalculate: Bool {
-        return principalAmount != nil &&
-               annualInterestRate != nil &&
-               loanTermYears != nil &&
-               !calculationName.isEmpty
-    }
-    
-    private func performCalculation() {
-        withAnimation(.easeInOut(duration: 0.3)) {
-            isCalculating = true
-            validationErrors = []
+        guard let principal = principalAmount,
+              let rate = annualInterestRate,
+              let term = loanTermYears,
+              !calculationName.isEmpty else {
+            return false
         }
-        
+        // Mirror the model's validity checks so the button state never lies
+        return principal > 0 &&
+               rate >= 0 &&
+               term > 0 &&
+               term <= 100 &&
+               (downPayment ?? 0) >= 0 &&
+               (extraPayment ?? 0) >= 0 &&
+               (downPayment ?? 0) < principal
+    }
+
+    private func performCalculation() {
+        validationErrors = []
+
         guard let principal = principalAmount,
               let rate = annualInterestRate,
               let term = loanTermYears else {
             validationErrors = ["Please fill in all required fields"]
-            isCalculating = false
             return
         }
-        
+
         // Create a temporary calculation for validation and result computation
         let tempCalculation = LoanCalculation(
             name: calculationName,
@@ -356,24 +377,19 @@ struct LoanCalculatorView: View {
             annualInterestRate: rate,
             loanTermYears: term,
             paymentFrequency: paymentFrequency,
-            downPayment: downPayment ?? 0,
+            downPayment: isMortgage ? (downPayment ?? 0) : 0,
             extraPayment: extraPayment ?? 0,
             loanType: loanType,
             currency: currency
         )
-        
-        // Simulate calculation delay for better UX
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                isCalculating = false
-                
-                if tempCalculation.isValid {
-                    calculationResult = tempCalculation.result
-                    calculation = tempCalculation
-                } else {
-                    validationErrors = tempCalculation.validationErrors
-                    calculationResult = nil
-                }
+
+        withAnimation(.easeInOut(duration: 0.3)) {
+            if tempCalculation.isValid {
+                calculationResult = tempCalculation.result
+                calculation = tempCalculation
+            } else {
+                validationErrors = tempCalculation.validationErrors
+                calculationResult = nil
             }
         }
     }
@@ -413,6 +429,7 @@ struct LoanCalculatorView: View {
             principalAmount = nil
             annualInterestRate = nil
             loanTermYears = nil
+            loanTermText = ""
             downPayment = nil
             extraPayment = nil
             calculationResult = nil
@@ -521,7 +538,10 @@ struct AmortizationTableView: View {
                     TextField("Search payments...", text: $searchText)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 200)
-                    
+                        .onChange(of: searchText) {
+                            currentPage = 0
+                        }
+
                     Text("\(filteredData.count) payments")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -640,7 +660,10 @@ struct AmortizationTableView: View {
     }
     
     private var paginatedData: [TableRow] {
-        let startIndex = currentPage * itemsPerPage
+        // Clamp the page so a narrowing search can never produce an invalid range
+        let page = min(currentPage, max(totalPages - 1, 0))
+        let startIndex = page * itemsPerPage
+        guard startIndex < filteredData.count else { return [] }
         let endIndex = min(startIndex + itemsPerPage, filteredData.count)
         return Array(filteredData[startIndex..<endIndex])
     }

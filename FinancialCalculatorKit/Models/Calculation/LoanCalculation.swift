@@ -187,6 +187,7 @@ final class LoanCalculation {
         return principalAmount > 0 &&
                annualInterestRate >= 0 &&
                loanTermYears > 0 &&
+               loanTermYears <= 100 &&
                downPayment >= 0 &&
                extraPayment >= 0 &&
                downPayment < principalAmount
@@ -209,6 +210,10 @@ final class LoanCalculation {
         
         if loanTermYears <= 0 {
             errors.append("Loan term must be positive")
+        }
+
+        if loanTermYears > 100 {
+            errors.append("Loan term must be 100 years or less")
         }
         
         if downPayment < 0 {
@@ -258,7 +263,7 @@ final class LoanCalculation {
         let periodRate = periodicRateDecimal
         let basePayment = calculateMonthlyPayment() - self.extraPayment
         let totalPayment = basePayment + extraPayment
-        let maxPayments = Int(paymentFrequency.numberOfPeriods(from: loanTermYears).rounded())
+        let maxPayments = max(1, Int(paymentFrequency.numberOfPeriods(from: loanTermYears).rounded()))
 
         var schedule: [AmortizationEntry] = []
         var remainingBalance = loanAmount
@@ -298,18 +303,26 @@ final class LoanCalculation {
         return schedule
     }
     
-    /// Generate chart data for payment breakdown visualization
+    /// Generate the remaining-balance series for the loan chart.
+    /// Down-samples long schedules so the chart stays light.
     private func generatePaymentBreakdownData(amortization: [AmortizationEntry]) -> [ChartDataPoint] {
-        var data: [ChartDataPoint] = []
-        
-        for (index, entry) in amortization.enumerated() {
-            let year = paymentFrequency.yearsFromPeriods(Double(index + 1))
-            
-            // Create data points for principal and interest
-            data.append(ChartDataPoint(x: year, y: entry.principalPayment, label: "Principal"))
-            data.append(ChartDataPoint(x: year, y: entry.interestPayment, label: "Interest"))
+        guard !amortization.isEmpty else { return [] }
+
+        var data: [ChartDataPoint] = [
+            ChartDataPoint(x: 0, y: principalAmount - downPayment, label: "Start")
+        ]
+
+        // At most ~120 plotted points regardless of schedule length
+        let stride = max(1, amortization.count / 120)
+        for (index, entry) in amortization.enumerated() where index % stride == 0 || index == amortization.count - 1 {
+            let year = paymentFrequency.yearsFromPeriods(Double(entry.paymentNumber))
+            data.append(ChartDataPoint(
+                x: year,
+                y: entry.remainingBalance,
+                label: "Payment \(entry.paymentNumber)"
+            ))
         }
-        
+
         return data
     }
     

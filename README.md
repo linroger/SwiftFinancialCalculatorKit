@@ -17,11 +17,12 @@ A comprehensive, feature-rich financial calculator app for macOS built with Swif
 | **Time Value of Money (TVM)** | Present Value (PV), Future Value (FV), Payment (PMT), Interest Rate (I/Y), Number of Periods (N), Annuity calculations |
 | **Loan Calculator** | Monthly payment, amortization schedules, total interest, extra payment scenarios, refinancing analysis |
 | **Mortgage Calculator** | Home loan analysis, down payment scenarios, PMI calculation, payment schedules |
+| **Retirement Planner** | Nest-egg projection, required-savings gap analysis, sustainable income, depletion-age simulation |
 | **Bond Calculator** | Bond pricing, Yield to Maturity (YTM), duration, convexity, sensitivity analysis, cash flow schedules |
 | **Investment Analysis** | Net Present Value (NPV), Internal Rate of Return (IRR), Modified IRR (MIRR), payback period, profitability index |
 | **Options Calculator** | Black-Scholes pricing, Greeks analysis (Delta, Gamma, Theta, Vega), risk assessment |
 | **Depreciation Calculator** | Straight-line, Declining Balance, Sum-of-Years Digits, MACRS methods |
-| **Currency Converter** | Real-time exchange rates, multi-currency support, historical rate tracking |
+| **Currency Converter** | Daily reference exchange rates, multi-currency support, saved conversion history |
 | **Unit Converter** | International unit conversions for financial calculations |
 | **Math Expression Evaluator** | Custom formula parsing with financial functions and variables |
 
@@ -53,7 +54,7 @@ A comprehensive, feature-rich financial calculator app for macOS built with Swif
 
 - **Native macOS Design** — Follows Apple Human Interface Guidelines
 - **Adaptive Layout** — Responsive design for different window sizes
-- **Multi-Currency Support** — 8+ major currencies with real-time formatting
+- **Multi-Currency Support** — 16 currencies with locale-aware formatting
 - **Accessibility** — Full keyboard navigation and VoiceOver support
 
 ---
@@ -168,11 +169,12 @@ Copyright © 2025 Roger Lin. All rights reserved.
 | **货币时间价值 (TVM)** | 现值 (PV)、终值 (FV)、每期付款 (PMT)、利率 (I/Y)、期数 (N)、年金计算 |
 | **贷款计算器** | 月供计算、摊销计划表、利息总额、额外还款方案、再融资分析 |
 | **抵押贷款计算器** | 房贷分析、首付方案、PMI 计算、还款计划表 |
+| **退休规划** | 退休储蓄预测、所需储蓄缺口分析、可持续收入、资金耗尽年龄模拟 |
 | **债券计算器** | 债券定价、到期收益率 (YTM)、久期、凸性、敏感性分析、现金流表 |
 | **投资分析** | 净现值 (NPV)、内部收益率 (IRR)、改进内部收益率 (MIRR)、回收期、获利指数 |
 | **期权计算器** | 布莱克-舒尔斯定价、希腊值分析（Delta、Gamma、Theta、Vega）、风险评估 |
 | **折旧计算器** | 直线法、余额递减法、年数总和法、MACRS 法 |
-| **货币换算** | 实时汇率、多币种支持、历史汇率查询 |
+| **货币换算** | 每日参考汇率、多币种支持、换算历史保存 |
 | **单位换算** | 国际单位换算，用于财务计算 |
 | **数学表达式计算器** | 自定义公式解析，支持财务函数和变量 |
 

@@ -14,7 +14,6 @@ struct DepreciationCalculatorView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(MainViewModel.self) private var mainViewModel
     
-    @State private var calculation: DepreciationCalculation?
     @State private var calculationName: String = ""
     @State private var assetCost: Double = 100000.0
     @State private var salvageValue: Double = 10000.0
@@ -25,7 +24,6 @@ struct DepreciationCalculatorView: View {
     @State private var decliningBalanceRate: Double = 2.0
     @State private var currency: Currency = .usd
     
-    @State private var isCalculating: Bool = false
     @State private var calculationResult: CalculationResult?
     @State private var validationErrors: [String] = []
     @State private var showingDepreciationSchedule: Bool = false
@@ -87,6 +85,8 @@ struct DepreciationCalculatorView: View {
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
+                .help("More actions")
+                .accessibilityLabel("More Actions")
             }
         }
         .sheet(isPresented: $showingDepreciationSchedule) {
@@ -128,10 +128,7 @@ struct DepreciationCalculatorView: View {
                 Spacer()
                 
                 VStack(alignment: .trailing, spacing: 4) {
-                    if isCalculating {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                    } else if calculationResult?.isValid == true {
+                    if calculationResult?.isValid == true {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundColor(.green)
                     }
@@ -220,7 +217,10 @@ struct DepreciationCalculatorView: View {
                             currency: currency,
                             placeholder: "Salvage value"
                         ) { newValue in
-                            salvageValue = max(0, min(newValue, assetCost))
+                            // Salvage must stay strictly below the asset cost or the
+                            // Calculate button would silently disable with no message
+                            let ceiling = max(assetCost - 0.01, 0)
+                            salvageValue = max(0, min(newValue, ceiling))
                             clearResults()
                         }
                     }
@@ -750,7 +750,7 @@ struct DepreciationCalculatorView: View {
             return String(format: "%.2f%%", value)
         } else if key.contains("Year") || key.contains("Life") {
             return String(format: "%.0f", value)
-        } else if key.contains("Cost") || key.contains("Value") || key.contains("Depreciation") {
+        } else if key.contains("Cost") || key.contains("Value") || key.contains("Depreciation") || key.contains("Base") {
             return currency.formatValue(value)
         } else {
             return Formatters.decimalFormatter(decimalPlaces: 2).string(from: NSNumber(value: value)) ?? "0.00"
@@ -845,7 +845,15 @@ struct DepreciationScheduleView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             DetailRow(title: "Asset Cost", value: currency.formatValue(depreciationData.assetCost))
                             DetailRow(title: "Salvage Value", value: currency.formatValue(depreciationData.salvageValue))
-                            DetailRow(title: "Depreciable Base", value: currency.formatValue(depreciationData.assetCost - depreciationData.salvageValue))
+                            // MACRS depreciates the full cost basis; salvage is ignored by convention
+                            DetailRow(
+                                title: "Depreciable Base",
+                                value: currency.formatValue(
+                                    depreciationData.method == .macrs
+                                        ? depreciationData.assetCost
+                                        : depreciationData.assetCost - depreciationData.salvageValue
+                                )
+                            )
                             DetailRow(title: "Useful Life", value: "\(Int(depreciationData.usefulLife)) years")
                             DetailRow(title: "Method", value: depreciationData.method.displayName)
                         }

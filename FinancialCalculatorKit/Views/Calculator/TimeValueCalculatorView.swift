@@ -22,14 +22,15 @@ struct TimeValueCalculatorView: View {
     @State private var payment: Double? = nil
     @State private var interestRate: Double? = nil
     @State private var numberOfYears: Double? = nil
+    @State private var numberOfYearsText: String = ""
     @State private var paymentFrequency: PaymentFrequency = .monthly
     @State private var paymentsAtBeginning: Bool = false
     @State private var solveFor: TimeValueVariable = .futureValue
     @State private var currency: Currency = .usd
 
-    @State private var isCalculating: Bool = false
     @State private var calculationResult: CalculationResult?
     @State private var validationErrors: [String] = []
+    @State private var didSave: Bool = false
 
     private var analysisSnapshot: TVMAnalysisSnapshot? {
         TVMAnalysisEngine.buildSnapshot(
@@ -62,15 +63,21 @@ struct TimeValueCalculatorView: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(!canCalculate)
 
-                Button("Save") {
+                Button(didSave ? "Saved" : "Save", systemImage: didSave ? "checkmark" : "square.and.arrow.down") {
                     saveCalculation()
                 }
-                .disabled(calculationResult == nil || calculationName.isEmpty)
+                .disabled(calculationResult == nil || calculationName.isEmpty || didSave)
 
-                Button("Clear") {
-                    clearAll()
+                Menu {
+                    Button("Export Results", action: exportResults)
+                        .disabled(calculationResult == nil)
+                    Divider()
+                    Button("Clear All Fields", action: clearAll)
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                 }
-                .buttonStyle(.bordered)
+                .help("More actions")
+                .accessibilityLabel("More Actions")
             }
         }
         .onAppear {
@@ -80,7 +87,10 @@ struct TimeValueCalculatorView: View {
         .onChange(of: futureValue) { clearResults() }
         .onChange(of: payment) { clearResults() }
         .onChange(of: interestRate) { clearResults() }
-        .onChange(of: numberOfYears) { clearResults() }
+        .onChange(of: numberOfYearsText) {
+            numberOfYears = parseUserNumber(numberOfYearsText)
+            clearResults()
+        }
         .onChange(of: paymentFrequency) { clearResults() }
         .onChange(of: paymentsAtBeginning) { clearResults() }
         .onChange(of: currency) { clearResults() }
@@ -92,7 +102,9 @@ struct TimeValueCalculatorView: View {
             case .futureValue: futureValue = nil
             case .payment: payment = nil
             case .interestRate: interestRate = nil
-            case .numberOfYears: numberOfYears = nil
+            case .numberOfYears:
+                numberOfYears = nil
+                numberOfYearsText = ""
             }
             clearResults()
         }
@@ -107,7 +119,7 @@ struct TimeValueCalculatorView: View {
                         .font(.largeTitle)
                         .fontWeight(.bold)
 
-                    Text("Build funding plans, compare rate scenarios, and explain how each assumption changes the outcome. This view now works like a planning cockpit, not just a formula form.")
+                    Text("Build funding plans, compare rate scenarios, and see how each assumption changes the outcome.")
                         .font(.body)
                         .foregroundColor(.secondary)
                         .frame(maxWidth: 720, alignment: .leading)
@@ -126,7 +138,7 @@ struct TimeValueCalculatorView: View {
                     .frame(width: 220)
 
                     Picker("Currency", selection: $currency) {
-                        ForEach(Currency.allCases.prefix(10)) { curr in
+                        ForEach(Currency.allCases) { curr in
                             Text("\(curr.symbol) \(curr.rawValue)")
                                 .tag(curr)
                         }
@@ -242,10 +254,7 @@ struct TimeValueCalculatorView: View {
                     InputFieldView(
                         title: "Number of Years",
                         subtitle: "Planning horizon",
-                        value: Binding(
-                            get: { numberOfYears?.description ?? "" },
-                            set: { numberOfYears = Double($0) }
-                        ),
+                        value: $numberOfYearsText,
                         placeholder: "10",
                         keyboardType: .decimalPad,
                         validation: solveFor != .numberOfYears ? .positiveNumber : nil,
@@ -266,28 +275,35 @@ struct TimeValueCalculatorView: View {
     @ViewBuilder
     private var analyticsColumn: some View {
         VStack(spacing: 20) {
-            if isCalculating {
-                LoadingResultView()
-            } else if let result = calculationResult, let snapshot = analysisSnapshot {
-                TVMHeroResultCard(
-                    result: result,
-                    solveFor: solveFor,
-                    snapshot: snapshot,
-                    currency: currency
-                )
+            if let result = calculationResult {
+                if let snapshot = analysisSnapshot {
+                    TVMHeroResultCard(
+                        result: result,
+                        solveFor: solveFor,
+                        snapshot: snapshot,
+                        currency: currency
+                    )
 
-                TVMMetricGrid(snapshot: snapshot, currency: currency)
+                    TVMMetricGrid(snapshot: snapshot, currency: currency)
 
-                TVMGrowthWorkspace(snapshot: snapshot, currency: currency)
+                    TVMGrowthWorkspace(snapshot: snapshot, currency: currency)
 
-                HStack(alignment: .top, spacing: 20) {
-                    TVMScenarioExplorer(snapshot: snapshot, currency: currency)
-                    TVMMilestoneBoard(snapshot: snapshot, currency: currency)
+                    HStack(alignment: .top, spacing: 20) {
+                        TVMScenarioExplorer(snapshot: snapshot, currency: currency)
+                        TVMMilestoneBoard(snapshot: snapshot, currency: currency)
+                    }
+
+                    TVMInsightPanel(
+                        insights: generateInsights(snapshot: snapshot, result: result)
+                    )
+                } else {
+                    // No analytics snapshot (e.g. a "No solution" outcome) —
+                    // still show the solved result and its explanation
+                    ErrorResultView(
+                        error: result.formattedPrimaryValue,
+                        suggestions: [result.explanation]
+                    )
                 }
-
-                TVMInsightPanel(
-                    insights: generateInsights(snapshot: snapshot, result: result)
-                )
             } else {
                 placeholderResultView
             }
@@ -404,6 +420,23 @@ struct TimeValueCalculatorView: View {
             }
         }
 
+        // Sign/range checks, mirroring the model's validationErrors
+        if let pv = presentValue, pv < 0 {
+            missing.append("Present value cannot be negative")
+        }
+        if let fv = futureValue, fv < 0 {
+            missing.append("Future value cannot be negative")
+        }
+        if let rate = interestRate, rate < 0 {
+            missing.append("Interest rate cannot be negative")
+        }
+        if let years = numberOfYears, years <= 0 {
+            missing.append("Number of years must be positive")
+        }
+        if let years = numberOfYears, years > 1000 {
+            missing.append("Number of years must be 1000 or less")
+        }
+
         return missing
     }
 
@@ -412,10 +445,7 @@ struct TimeValueCalculatorView: View {
     }
 
     private func performCalculation() {
-        withAnimation(.easeInOut(duration: 0.25)) {
-            isCalculating = true
-            validationErrors = []
-        }
+        validationErrors = []
 
         let tempCalculation = TimeValueCalculation(
             name: calculationName,
@@ -431,17 +461,13 @@ struct TimeValueCalculatorView: View {
         tempCalculation.annualInterestRate = interestRate
         tempCalculation.numberOfYears = numberOfYears
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-            withAnimation(.easeInOut(duration: 0.25)) {
-                isCalculating = false
-
-                if tempCalculation.isValid {
-                    calculationResult = tempCalculation.result
-                    calculation = tempCalculation
-                } else {
-                    validationErrors = tempCalculation.validationErrors
-                    calculationResult = nil
-                }
+        withAnimation(.easeInOut(duration: 0.25)) {
+            if tempCalculation.isValid {
+                calculationResult = tempCalculation.result
+                calculation = tempCalculation
+            } else {
+                validationErrors = tempCalculation.validationErrors
+                calculationResult = nil
             }
         }
     }
@@ -454,8 +480,30 @@ struct TimeValueCalculatorView: View {
 
         do {
             try modelContext.save()
+
+            withAnimation(.easeInOut(duration: 0.2)) {
+                didSave = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    didSave = false
+                }
+            }
         } catch {
             mainViewModel.handleError(.dataExportFailed("Failed to save calculation: \(error.localizedDescription)"))
+        }
+    }
+
+    private func exportResults() {
+        guard let result = calculationResult else { return }
+        do {
+            _ = try CalculationExporter.exportResult(
+                suggestedName: calculationName.isEmpty ? "TVM Calculation" : calculationName,
+                primaryLabel: solveFor.displayName,
+                result: result
+            )
+        } catch {
+            mainViewModel.handleError(.dataExportFailed(error.localizedDescription))
         }
     }
 
@@ -463,6 +511,7 @@ struct TimeValueCalculatorView: View {
         calculationResult = nil
         calculation = nil
         validationErrors = []
+        didSave = false
     }
 
     private func clearAll() {
@@ -472,9 +521,12 @@ struct TimeValueCalculatorView: View {
             payment = nil
             interestRate = nil
             numberOfYears = nil
+            numberOfYearsText = ""
             calculationResult = nil
+            calculation = nil
             validationErrors = []
             calculationName = ""
+            didSave = false
         }
     }
 

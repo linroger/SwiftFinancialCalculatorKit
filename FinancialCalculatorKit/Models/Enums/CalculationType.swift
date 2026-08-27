@@ -12,6 +12,7 @@ enum CalculationType: String, CaseIterable, Identifiable {
     case timeValue = "timeValue"
     case loan = "loan"
     case mortgage = "mortgage"
+    case retirement = "retirement"
     case bond = "bond"
     case investment = "investment"
     case options = "options"
@@ -30,6 +31,8 @@ enum CalculationType: String, CaseIterable, Identifiable {
             return "Loan Calculator"
         case .mortgage:
             return "Mortgage Calculator"
+        case .retirement:
+            return "Retirement Planner"
         case .bond:
             return "Bond Calculator"
         case .investment:
@@ -55,6 +58,8 @@ enum CalculationType: String, CaseIterable, Identifiable {
             return "Analyze loan payments, interest, and amortization schedules"
         case .mortgage:
             return "Calculate mortgage payments, total interest, and payment schedules"
+        case .retirement:
+            return "Project savings to retirement, required nest egg, and sustainable income"
         case .bond:
             return "Bond pricing, yield calculations, and sensitivity analysis"
         case .investment:
@@ -66,7 +71,7 @@ enum CalculationType: String, CaseIterable, Identifiable {
         case .depreciation:
             return "Straight-line, declining balance, and MACRS depreciation"
         case .currency:
-            return "Real-time currency exchange rates and conversions"
+            return "Daily reference exchange rates and currency conversions"
         case .conversion:
             return "Unit conversions for international calculations"
         }
@@ -80,6 +85,8 @@ enum CalculationType: String, CaseIterable, Identifiable {
             return "creditcard"
         case .mortgage:
             return "house"
+        case .retirement:
+            return "figure.walk.motion"
         case .bond:
             return "chart.line.uptrend.xyaxis"
         case .investment:
@@ -99,7 +106,7 @@ enum CalculationType: String, CaseIterable, Identifiable {
 
     var category: CalculationCategory {
         switch self {
-        case .timeValue, .loan, .mortgage, .depreciation:
+        case .timeValue, .loan, .mortgage, .retirement, .depreciation:
             return .basics
         case .bond, .investment, .options:
             return .investment

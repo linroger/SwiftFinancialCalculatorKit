@@ -158,7 +158,8 @@ final class DepreciationCalculation {
         secondaryValues["Current Year"] = currentYear
         secondaryValues["Cumulative Depreciation"] = cumulativeDepreciation
         secondaryValues["Book Value"] = bookValue
-        secondaryValues["Depreciable Base"] = assetCost - salvageValue
+        // MACRS depreciates the full cost basis; salvage is ignored by convention
+        secondaryValues["Depreciable Base"] = method == .macrs ? assetCost : assetCost - salvageValue
         
         // Calculate depreciation rate for current method
         let depreciationRate = calculateDepreciationRate()

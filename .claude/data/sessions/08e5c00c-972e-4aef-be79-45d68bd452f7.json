@@ -2,6 +2,7 @@
   "session_id": "08e5c00c-972e-4aef-be79-45d68bd452f7",
   "prompts": [
     "study this app's codebase and repair all errors and improve it and optimize it and make sure all features and functions work as expected.",
-    "/login"
+    "/login",
+    "keep iterating and refining and improving until everything from the ui to the functions are absolutely perfect. when you are done, push to git"
   ]
 }

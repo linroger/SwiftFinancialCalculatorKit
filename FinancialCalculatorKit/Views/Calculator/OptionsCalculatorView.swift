@@ -25,7 +25,6 @@ struct OptionsCalculatorView: View {
     @State private var optionType: CalculationEngine.OptionType = .call
     @State private var currency: Currency = .usd
     
-    @State private var isCalculating: Bool = false
     @State private var calculationResult: CalculationResult?
     @State private var validationErrors: [String] = []
     @State private var showingGreeksAnalysis: Bool = false
@@ -74,12 +73,21 @@ struct OptionsCalculatorView: View {
                     
                     Divider()
                     
+                    Button("Export Results") {
+                        exportResults()
+                    }
+                    .disabled(calculationResult == nil)
+
+                    Divider()
+
                     Button("Reset Fields") {
                         resetFields()
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
+                .help("More actions")
+                .accessibilityLabel("More Actions")
             }
         }
         .sheet(isPresented: $showingGreeksAnalysis) {
@@ -122,10 +130,7 @@ struct OptionsCalculatorView: View {
                 Spacer()
                 
                 VStack(alignment: .trailing, spacing: 4) {
-                    if isCalculating {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                    } else if calculationResult != nil {
+                    if calculationResult != nil {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundColor(.green)
                     }
@@ -280,64 +285,36 @@ struct OptionsCalculatorView: View {
             GroupBox("Market Parameters") {
                 VStack(spacing: 16) {
                     // Risk-free rate
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Risk-Free Rate (%)")
-                                .font(.headline)
-                                .fontWeight(.medium)
-
-                            Spacer()
-
-                            Image(systemName: "questionmark.circle")
-                                .foregroundColor(.secondary)
-                                .help("Risk-free interest rate (e.g., Treasury rate)")
-                        }
-                        
-                        PercentageInputField(
-                            title: "Risk-Free Rate",
-                            value: Binding(
-                                get: { riskFreeRate },
-                                set: { 
-                                    if let newValue = $0 { 
-                                        riskFreeRate = max(0, newValue)
-                                        clearResults()
-                                    }
+                    PercentageInputField(
+                        title: "Risk-Free Rate",
+                        value: Binding(
+                            get: { riskFreeRate },
+                            set: {
+                                if let newValue = $0 {
+                                    riskFreeRate = max(0, newValue)
+                                    clearResults()
                                 }
-                            ),
-                            isRequired: true,
-                            helpText: "Risk-free interest rate (e.g., Treasury rate)"
-                        )
-                    }
-                    
+                            }
+                        ),
+                        isRequired: true,
+                        helpText: "Risk-free interest rate (e.g., Treasury rate)"
+                    )
+
                     // Volatility
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Volatility (σ %)")
-                                .font(.headline)
-                                .fontWeight(.medium)
-
-                            Spacer()
-
-                            Image(systemName: "questionmark.circle")
-                                .foregroundColor(.secondary)
-                                .help("Annualized volatility of the underlying asset")
-                        }
-                        
-                        PercentageInputField(
-                            title: "Volatility",
-                            value: Binding(
-                                get: { volatility },
-                                set: { 
-                                    if let newValue = $0 { 
-                                        volatility = max(0, newValue)
-                                        clearResults()
-                                    }
+                    PercentageInputField(
+                        title: "Volatility (σ)",
+                        value: Binding(
+                            get: { volatility },
+                            set: {
+                                if let newValue = $0 {
+                                    volatility = max(0, newValue)
+                                    clearResults()
                                 }
-                            ),
-                            isRequired: true,
-                            helpText: "Annualized volatility of the underlying asset"
-                        )
-                    }
+                            }
+                        ),
+                        isRequired: true,
+                        helpText: "Annualized volatility of the underlying asset"
+                    )
                 }
                 .padding(16)
             }
@@ -596,8 +573,23 @@ struct OptionsCalculatorView: View {
         clearResults()
     }
     
+    private func exportResults() {
+        guard let result = calculationResult else { return }
+        do {
+            _ = try CalculationExporter.exportResult(
+                suggestedName: calculationName.isEmpty ? "Options Calculation" : calculationName,
+                primaryLabel: "Option Premium",
+                result: result
+            )
+        } catch {
+            mainViewModel.handleError(.dataExportFailed(error.localizedDescription))
+        }
+    }
+
     private func saveCalculation() {
         guard let calc = calculation, calc.isValid else { return }
+        // The name field doesn't invalidate results, so pick up its latest value here
+        calc.name = calculationName.isEmpty ? calc.name : calculationName
         calc.updateTimestamp()
         modelContext.insert(calc)
         do {

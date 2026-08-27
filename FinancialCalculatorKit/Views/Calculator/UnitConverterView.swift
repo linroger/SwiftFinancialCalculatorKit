@@ -82,16 +82,14 @@ struct UnitConverterView: View {
             // Unit category selection
             GroupBox("Unit Category") {
                 VStack(spacing: 16) {
+                    // A menu keeps the 8 category names readable; segments truncated
                     Picker("Category", selection: $selectedCategory) {
                         ForEach(UnitCategory.allCases) { category in
-                            HStack {
-                                Image(systemName: category.systemImage)
-                                Text(category.displayName)
-                            }
-                            .tag(category)
+                            Label(category.displayName, systemImage: category.systemImage)
+                                .tag(category)
                         }
                     }
-                    .pickerStyle(.segmented)
+                    .pickerStyle(.menu)
                     
                     Text(selectedCategory.description)
                         .font(.caption)

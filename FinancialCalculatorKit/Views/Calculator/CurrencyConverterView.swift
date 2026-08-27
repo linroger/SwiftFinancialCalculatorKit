@@ -16,11 +16,13 @@ struct CurrencyConverterView: View {
     @State private var amount: Double = 100.0
     @State private var fromCurrency: Currency = .usd
     @State private var toCurrency: Currency = .eur
-    @State private var exchangeRate: Double = 1.0
+    // Zero means "no rate yet" — the view shows the honest unavailable state
+    @State private var exchangeRate: Double = 0.0
     @State private var convertedAmount: Double = 0.0
     @State private var isLoading: Bool = false
-    @State private var lastUpdated: Date = Date()
+    @State private var lastUpdated: Date? = nil
     @State private var nextUpdate: Date? = nil
+    @State private var refreshTask: Task<Void, Never>? = nil
     @State private var showAllCurrencies: Bool = false
     @State private var conversionHistory: [CurrencyConversionCalculation] = []
     @State private var liveRates: [Currency: Double] = [:]
@@ -61,9 +63,15 @@ struct CurrencyConverterView: View {
         .background(Color(NSColor.windowBackgroundColor))
         .onAppear {
             loadHistory()
-            Task {
-                await refreshRates()
-            }
+            startRefresh()
+        }
+    }
+
+    /// Cancel any in-flight fetch and start a new one for the current base currency.
+    private func startRefresh(forceRefresh: Bool = false) {
+        refreshTask?.cancel()
+        refreshTask = Task {
+            await refreshRates(forceRefresh: forceRefresh)
         }
     }
     
@@ -95,7 +103,7 @@ struct CurrencyConverterView: View {
                             .foregroundColor(.green)
                     }
                     
-                    Text("Last updated: \(lastUpdated.formatted(as: .short))")
+                    Text("Last updated: \(lastUpdated.map { $0.formatted(as: .short) } ?? "—")")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -142,7 +150,7 @@ struct CurrencyConverterView: View {
                                 .fontWeight(.medium)
                             
                             Picker("From Currency", selection: $fromCurrency) {
-                                ForEach(Currency.allCases.prefix(showAllCurrencies ? 16 : 8)) { currency in
+                                ForEach(pickerChoices(including: fromCurrency)) { currency in
                                     HStack {
                                         Text(currency.countryCode)
                                             .font(.system(.body, design: .monospaced))
@@ -153,9 +161,13 @@ struct CurrencyConverterView: View {
                             }
                             .pickerStyle(.menu)
                             .onChange(of: fromCurrency) { _, _ in
-                                Task {
-                                    await refreshRates()
-                                }
+                                // Drop the old base's rates immediately so they can't
+                                // be shown (or saved) relabeled as the new pair
+                                liveRates = [:]
+                                exchangeRate = 0
+                                convertedAmount = 0
+                                usingFallbackRates = false
+                                startRefresh()
                             }
                         }
                         
@@ -174,7 +186,7 @@ struct CurrencyConverterView: View {
                                 .fontWeight(.medium)
                             
                             Picker("To Currency", selection: $toCurrency) {
-                                ForEach(Currency.allCases.prefix(showAllCurrencies ? 16 : 8)) { currency in
+                                ForEach(pickerChoices(including: toCurrency)) { currency in
                                     HStack {
                                         Text(currency.countryCode)
                                             .font(.system(.body, design: .monospaced))
@@ -234,7 +246,7 @@ struct CurrencyConverterView: View {
                         .foregroundColor(.secondary)
                     
                     if exchangeRate > 0 {
-                        Text("\(toCurrency.symbol)\(Formatters.decimalFormatter(decimalPlaces: 2).string(from: NSNumber(value: convertedAmount)) ?? "0.00")")
+                        Text(toCurrency.formatValue(convertedAmount))
                             .font(.system(size: 36, weight: .bold, design: .rounded))
                             .foregroundColor(.primary)
                     } else {
@@ -259,7 +271,7 @@ struct CurrencyConverterView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     DetailRow(
                         title: "Original Amount",
-                        value: "\(fromCurrency.symbol)\(Formatters.decimalFormatter(decimalPlaces: 2).string(from: NSNumber(value: amount)) ?? "0.00")"
+                        value: fromCurrency.formatValue(amount)
                     )
                     
                     DetailRow(
@@ -271,9 +283,7 @@ struct CurrencyConverterView: View {
 
                     DetailRow(
                         title: "Converted Amount",
-                        value: exchangeRate > 0
-                            ? "\(toCurrency.symbol)\(Formatters.decimalFormatter(decimalPlaces: 2).string(from: NSNumber(value: convertedAmount)) ?? "0.00")"
-                            : "—",
+                        value: exchangeRate > 0 ? toCurrency.formatValue(convertedAmount) : "—",
                         isHighlighted: true
                     )
 
@@ -332,9 +342,7 @@ struct CurrencyConverterView: View {
                 
                 HStack {
                     Button("Refresh Rates") {
-                        Task {
-                            await refreshRates(forceRefresh: true)
-                        }
+                        startRefresh(forceRefresh: true)
                     }
                     .buttonStyle(.bordered)
                     
@@ -458,9 +466,17 @@ struct CurrencyConverterView: View {
             fromCurrency = toCurrency
             toCurrency = temp
         }
-        Task {
-            await refreshRates()
+        // The fromCurrency onChange handler clears state and refreshes
+    }
+
+    /// Picker options: the leading prefix (or all currencies when toggled),
+    /// always including the current selection so it can never render blank.
+    private func pickerChoices(including selected: Currency) -> [Currency] {
+        var choices = Array(Currency.allCases.prefix(showAllCurrencies ? Currency.allCases.count : 8))
+        if !choices.contains(selected) {
+            choices.append(selected)
         }
+        return choices
     }
     
     /// The current rate for one unit of `fromCurrency` in `currency`.
@@ -501,18 +517,23 @@ struct CurrencyConverterView: View {
 
     @MainActor
     private func refreshRates(forceRefresh: Bool = false) async {
+        let requestedBase = fromCurrency
         isLoading = true
         defer { isLoading = false }
 
         do {
-            let snapshot = try await ExchangeRateService.shared.fetchLatest(base: fromCurrency, forceRefresh: forceRefresh)
+            let snapshot = try await ExchangeRateService.shared.fetchLatest(base: requestedBase, forceRefresh: forceRefresh)
+            // A slower response for a previously selected base must not
+            // overwrite the rates of the currency now selected
+            guard requestedBase == fromCurrency, !Task.isCancelled else { return }
             liveRates = snapshot.rates
             rateProviderName = snapshot.providerName
             lastUpdated = snapshot.fetchedAt
             nextUpdate = snapshot.nextUpdateAt
             usingFallbackRates = false
-            rateStatusMessage = "Daily reference rates for \(fromCurrency.rawValue) loaded from \(snapshot.providerName) (as of \(snapshot.fetchedAt.formatted(date: .abbreviated, time: .shortened)))."
+            rateStatusMessage = "Daily reference rates for \(requestedBase.rawValue) loaded from \(snapshot.providerName) (as of \(snapshot.fetchedAt.formatted(date: .abbreviated, time: .shortened)))."
         } catch {
+            guard requestedBase == fromCurrency, !Task.isCancelled else { return }
             usingFallbackRates = true
             rateStatusMessage = error.localizedDescription
             nextUpdate = nil
@@ -566,5 +587,6 @@ struct CurrencyConverterView: View {
 #Preview {
     CurrencyConverterView()
         .environment(MainViewModel())
+        .modelContainer(for: CurrencyConversionCalculation.self, inMemory: true)
         .frame(width: 1000, height: 800)
 }

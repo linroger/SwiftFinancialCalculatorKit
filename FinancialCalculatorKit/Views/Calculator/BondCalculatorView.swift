@@ -24,7 +24,6 @@ struct BondCalculatorView: View {
     @State private var solveFor: BondSolveFor = .price
     @State private var currency: Currency = .usd
     
-    @State private var isCalculating: Bool = false
     @State private var calculationResult: CalculationResult?
     @State private var validationErrors: [String] = []
     @State private var showingSensitivityAnalysis: Bool = false
@@ -41,7 +40,7 @@ struct BondCalculatorView: View {
                     resultSection
                 }
                 
-                if let result = calculationResult, result.isValid {
+                if hasSolution {
                     analysisSection
                 }
             }
@@ -75,6 +74,8 @@ struct BondCalculatorView: View {
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
+                .help("More actions")
+                .accessibilityLabel("More Actions")
             }
         }
         .sheet(isPresented: $showingSensitivityAnalysis) {
@@ -117,10 +118,7 @@ struct BondCalculatorView: View {
                 Spacer()
                 
                 VStack(alignment: .trailing, spacing: 4) {
-                    if isCalculating {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                    } else if calculationResult?.isValid == true {
+                    if hasSolution {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundColor(.green)
                     }
@@ -196,65 +194,37 @@ struct BondCalculatorView: View {
     
     @ViewBuilder
     private var faceValueField: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Face Value (Par Value)")
-                    .font(.headline)
-                    .fontWeight(.medium)
-
-                Spacer()
-
-                Image(systemName: "questionmark.circle")
-                    .foregroundColor(.secondary)
-                    .help("The amount paid to the bondholder at maturity")
-            }
-            
-            CurrencyInputField(
-                title: "Face Value",
-                value: Binding(
-                    get: { faceValue },
-                    set: { 
-                        faceValue = max(0, $0 ?? 0)
-                        clearResults()
-                    }
-                ),
-                currency: currency,
-                isRequired: true,
-                helpText: "The amount paid to the bondholder at maturity"
-            )
-        }
+        CurrencyInputField(
+            title: "Face Value (Par Value)",
+            value: Binding(
+                get: { faceValue },
+                set: {
+                    faceValue = max(0, $0 ?? 0)
+                    clearResults()
+                }
+            ),
+            currency: currency,
+            isRequired: true,
+            helpText: "The amount paid to the bondholder at maturity"
+        )
     }
-    
+
     @ViewBuilder
     private var couponRateField: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Coupon Rate (Annual %)")
-                    .font(.headline)
-                    .fontWeight(.medium)
-
-                Spacer()
-
-                Image(systemName: "questionmark.circle")
-                    .foregroundColor(.secondary)
-                    .help("Annual interest rate paid by the bond")
-            }
-            
-            PercentageInputField(
-                title: "Coupon Rate",
-                value: Binding(
-                    get: { couponRate },
-                    set: { 
-                        if let newValue = $0 { 
-                            couponRate = max(0, newValue)
-                            clearResults()
-                        }
+        PercentageInputField(
+            title: "Coupon Rate (Annual)",
+            value: Binding(
+                get: { couponRate },
+                set: {
+                    if let newValue = $0 {
+                        couponRate = max(0, newValue)
+                        clearResults()
                     }
-                ),
-                isRequired: true,
-                helpText: "Annual interest rate paid by the bond"
-            )
-        }
+                }
+            ),
+            isRequired: true,
+            helpText: "Annual interest rate paid by the bond"
+        )
     }
     
     @ViewBuilder
@@ -354,63 +324,35 @@ struct BondCalculatorView: View {
     
     @ViewBuilder
     private var marketRateField: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Required Yield (Market Rate %)")
-                    .font(.headline)
-                    .fontWeight(.medium)
-
-                Spacer()
-
-                Image(systemName: "questionmark.circle")
-                    .foregroundColor(.secondary)
-                    .help("The market interest rate for bonds of similar risk")
-            }
-            
-            PercentageInputField(
-                title: "Required Yield",
-                value: Binding(
-                    get: { marketRate },
-                    set: { 
-                        marketRate = $0
-                        clearResults()
-                    }
-                ),
-                isRequired: true,
-                helpText: "The market interest rate for bonds of similar risk"
-            )
-        }
+        PercentageInputField(
+            title: "Required Yield (Market Rate)",
+            value: Binding(
+                get: { marketRate },
+                set: {
+                    marketRate = $0
+                    clearResults()
+                }
+            ),
+            isRequired: true,
+            helpText: "The market interest rate for bonds of similar risk"
+        )
     }
-    
+
     @ViewBuilder
     private var currentPriceField: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Current Market Price")
-                    .font(.headline)
-                    .fontWeight(.medium)
-
-                Spacer()
-
-                Image(systemName: "questionmark.circle")
-                    .foregroundColor(.secondary)
-                    .help("The current trading price of the bond")
-            }
-            
-            CurrencyInputField(
-                title: "Current Price",
-                value: Binding(
-                    get: { currentPrice },
-                    set: {
-                        currentPrice = $0.map { max(0, $0) }
-                        clearResults()
-                    }
-                ),
-                currency: currency,
-                isRequired: true,
-                helpText: "The current trading price of the bond"
-            )
-        }
+        CurrencyInputField(
+            title: "Current Market Price",
+            value: Binding(
+                get: { currentPrice },
+                set: {
+                    currentPrice = $0.map { max(0, $0) }
+                    clearResults()
+                }
+            ),
+            currency: currency,
+            isRequired: true,
+            helpText: "The current trading price of the bond"
+        )
     }
     
     @ViewBuilder
@@ -422,7 +364,7 @@ struct BondCalculatorView: View {
                     .fontWeight(.medium)
                 
                 Picker("Currency", selection: $currency) {
-                    ForEach(Currency.allCases.prefix(8)) { curr in
+                    ForEach(Currency.allCases) { curr in
                         Text("\(curr.displayName) (\(curr.symbol))")
                             .tag(curr)
                     }
@@ -502,19 +444,21 @@ struct BondCalculatorView: View {
                 }
                 .groupBoxStyle(FinancialGroupBoxStyle())
                 
-                // Action buttons
-                VStack(spacing: 12) {
-                    Button("View Cash Flow Schedule") {
-                        showingCashFlowSchedule = true
+                // Action buttons — only meaningful when a real solution exists
+                if hasSolution {
+                    VStack(spacing: 12) {
+                        Button("View Cash Flow Schedule") {
+                            showingCashFlowSchedule = true
+                        }
+                        .buttonStyle(.bordered)
+                        .frame(maxWidth: .infinity)
+
+                        Button("Sensitivity Analysis") {
+                            showingSensitivityAnalysis = true
+                        }
+                        .buttonStyle(.bordered)
+                        .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.bordered)
-                    .frame(maxWidth: .infinity)
-                    
-                    Button("Sensitivity Analysis") {
-                        showingSensitivityAnalysis = true
-                    }
-                    .buttonStyle(.bordered)
-                    .frame(maxWidth: .infinity)
                 }
             } else {
                 // Placeholder when no results
@@ -615,7 +559,14 @@ struct BondCalculatorView: View {
     }
     
     private var canSave: Bool {
-        canCalculate && calculationResult?.isValid == true
+        canCalculate && hasSolution
+    }
+
+    /// True when the current result is a real solved value — the "No solution"
+    /// sentinel passes `isValid` but carries no secondary values.
+    private var hasSolution: Bool {
+        guard let result = calculationResult else { return false }
+        return result.isValid && !result.secondaryValues.isEmpty
     }
     
     private var currentBondData: (faceValue: Double, couponRate: Double, yearsToMaturity: Double, paymentsPerYear: Double) {
@@ -628,9 +579,8 @@ struct BondCalculatorView: View {
             return
         }
         
-        isCalculating = true
         validationErrors = []
-        
+
         // Create temporary calculation object
         let tempCalculation = BondCalculation(
             name: calculationName,
@@ -650,13 +600,10 @@ struct BondCalculatorView: View {
         }
         
         // Perform calculation
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            calculationResult = tempCalculation.result
-            isCalculating = false
-            
-            if calculationResult?.isValid != true {
-                validationErrors = tempCalculation.validationErrors
-            }
+        calculationResult = tempCalculation.result
+
+        if calculationResult?.isValid != true {
+            validationErrors = tempCalculation.validationErrors
         }
     }
     
@@ -769,7 +716,7 @@ struct BondCalculatorView: View {
     }
     
     private func generateInsights() -> [String] {
-        guard let result = calculationResult, result.isValid else { return [] }
+        guard hasSolution, let result = calculationResult else { return [] }
         
         var insights: [String] = []
         

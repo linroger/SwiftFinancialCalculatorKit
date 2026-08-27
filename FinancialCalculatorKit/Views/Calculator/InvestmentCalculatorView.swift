@@ -84,10 +84,15 @@ struct InvestmentCalculatorView: View {
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
+                .help("More actions")
+                .accessibilityLabel("More Actions")
             }
         }
         .sheet(isPresented: $showingCashFlowEditor) {
             CashFlowEditorView(cashFlows: $cashFlows, currency: currency)
+        }
+        .onChange(of: cashFlows) { _, _ in
+            clearResults()
         }
         .sheet(isPresented: $showingSensitivityAnalysis) {
             if let result = calculationResult {
@@ -210,29 +215,20 @@ struct InvestmentCalculatorView: View {
                     }
                     
                     // Discount rate
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Discount Rate (Required Return %)")
-                                .font(.headline)
-                                .fontWeight(.medium)
-
-                            Spacer()
-
-                            Image(systemName: "questionmark.circle")
-                                .foregroundColor(.secondary)
-                                .help("The minimum acceptable rate of return for the investment")
-                        }
-                        
-                        PercentageInputField(
-                            title: "Discount Rate",
-                            value: Binding(
-                                get: { discountRate },
-                                set: { if let newValue = $0 { discountRate = max(0, newValue) } }
-                            ),
-                            isRequired: true,
-                            helpText: "The minimum acceptable rate of return for the investment"
-                        )
-                    }
+                    PercentageInputField(
+                        title: "Discount Rate (Required Return)",
+                        value: Binding(
+                            get: { discountRate },
+                            set: {
+                                if let newValue = $0 {
+                                    discountRate = max(0, newValue)
+                                    clearResults()
+                                }
+                            }
+                        ),
+                        isRequired: true,
+                        helpText: "The minimum acceptable rate of return for the investment"
+                    )
                     
                     // Analysis type
                     VStack(alignment: .leading, spacing: 8) {
@@ -307,7 +303,7 @@ struct InvestmentCalculatorView: View {
                     // Quick stats
                     VStack(spacing: 8) {
                         DetailRow(
-                            title: "Total Cash Inflows",
+                            title: "Net Cash Flow",
                             value: currency.formatValue(cashFlows.reduce(0, +))
                         )
                         DetailRow(
@@ -334,7 +330,7 @@ struct InvestmentCalculatorView: View {
                         .fontWeight(.medium)
                     
                     Picker("Currency", selection: $currency) {
-                        ForEach(Currency.allCases.prefix(8)) { curr in
+                        ForEach(Currency.allCases) { curr in
                             Text("\(curr.displayName) (\(curr.symbol))")
                                 .tag(curr)
                         }
@@ -743,9 +739,10 @@ struct InvestmentCalculatorView: View {
         }
         
         if analysisType == .irr || analysisType == .both {
-            // For .both the primary value is NPV, so read the IRR from the secondary values
+            // For .both the primary value is NPV, so read the IRR from the secondary
+            // values; a "No IRR found" outcome must not be treated as a real 0% IRR
             let irrValue: Double? = analysisType == .irr
-                ? (result.primaryValue.isFinite ? result.primaryValue : nil)
+                ? (result.formattedPrimaryValue.contains("%") ? result.primaryValue : nil)
                 : result.secondaryValues["IRR"]
 
             if let irr = irrValue {
@@ -879,10 +876,13 @@ struct CashFlowEditorView: View {
     }
     
     private func deleteCashFlows(offsets: IndexSet) {
+        // Leave edit mode first — the edit field binds by index
+        editingIndex = nil
         cashFlows.remove(atOffsets: offsets)
     }
-    
+
     private func moveCashFlows(from source: IndexSet, to destination: Int) {
+        editingIndex = nil
         cashFlows.move(fromOffsets: source, toOffset: destination)
     }
 }
@@ -948,7 +948,17 @@ struct InvestmentSensitivityAnalysisView: View {
                     GroupBox("Sensitivity Metrics") {
                         VStack(alignment: .leading, spacing: 12) {
                             DetailRow(title: "Break-even Discount Rate", value: breakevenRateText)
-                            DetailRow(title: "NPV at Current Rate", value: currency.formatValue(baseResult.primaryValue))
+                            // Compute the NPV from the inputs — the base result's
+                            // primary value is the IRR (a percentage) in IRR mode
+                            DetailRow(
+                                title: "NPV at Current Rate",
+                                value: currency.formatValue(
+                                    CalculationEngine.calculateNPV(
+                                        cashFlows: [-abs(investmentData.initialInvestment)] + investmentData.cashFlows,
+                                        discountRate: investmentData.discountRate
+                                    )
+                                )
+                            )
 
                             Divider()
 

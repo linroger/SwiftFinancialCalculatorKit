@@ -96,7 +96,9 @@ class CalculationEngine {
         return stdDev != 0 ? excessReturn / stdDev : 0
     }
     
-    /// Calculate Value at Risk (VaR) using parametric method
+    /// Calculate Value at Risk (VaR) using the parametric (variance-covariance) method.
+    /// Returns the conventional positive loss magnitude at the given confidence level
+    /// (0 when the expected return outweighs the volatility term).
     static func calculateVaR(
         portfolioValue: Double,
         expectedReturn: Double,
@@ -104,12 +106,11 @@ class CalculationEngine {
         confidenceLevel: Double = 0.95,
         timeHorizon: Double = 1
     ) -> Double {
-        // Using normal distribution approximation
         let zScore = inverseNormalCDF(min(max(confidenceLevel, 0.5), 0.9999))
         let portfolioReturn = expectedReturn / 100 * timeHorizon
         let portfolioVolatility = volatility / 100 * Double.sqrt(timeHorizon)
-        
-        return portfolioValue * (portfolioReturn - zScore * portfolioVolatility)
+
+        return max(0, portfolioValue * (zScore * portfolioVolatility - portfolioReturn))
     }
     
     // MARK: - Advanced Bond Calculations
@@ -145,8 +146,9 @@ class CalculationEngine {
         let periodicCoupon = (faceValue * couponRate / 100) / paymentsPerYear
         let periodicRate = marketRate / 100 / paymentsPerYear
         let totalPeriods = yearsToMaturity * paymentsPerYear
-        let wholePeriods = Int(totalPeriods)
-        guard totalPeriods > 0, periodicRate > -1 else { return 0 }
+        guard totalPeriods > 0, totalPeriods.isFinite, periodicRate > -1 else { return 0 }
+        let wholePeriods = Int(min(totalPeriods, 100_000))
+        let fractionalPeriod = totalPeriods - Double(wholePeriods)
 
         var weightedCashFlows = 0.0
         var totalPresentValue = 0.0
@@ -159,7 +161,14 @@ class CalculationEngine {
                 totalPresentValue += pv
             }
         }
-        
+
+        // Fractional trailing coupon, matching the price function's annuity treatment
+        if fractionalPeriod > 0 {
+            let pv = periodicCoupon * fractionalPeriod / pow(1 + periodicRate, totalPeriods)
+            weightedCashFlows += pv * totalPeriods
+            totalPresentValue += pv
+        }
+
         // Add present value of face value
         let facePV = faceValue / pow(1 + periodicRate, totalPeriods)
         weightedCashFlows += facePV * totalPeriods
@@ -180,8 +189,9 @@ class CalculationEngine {
         let periodicCoupon = (faceValue * couponRate / 100) / paymentsPerYear
         let periodicRate = marketRate / 100 / paymentsPerYear
         let totalPeriods = yearsToMaturity * paymentsPerYear
-        let wholePeriods = Int(totalPeriods)
-        guard totalPeriods > 0, periodicRate > -1 else { return 0 }
+        guard totalPeriods > 0, totalPeriods.isFinite, periodicRate > -1 else { return 0 }
+        let wholePeriods = Int(min(totalPeriods, 100_000))
+        let fractionalPeriod = totalPeriods - Double(wholePeriods)
 
         var convexitySum = 0.0
         let bondPrice = calculateBondPrice(
@@ -200,6 +210,12 @@ class CalculationEngine {
                 let pv = cashFlow / pow(1 + periodicRate, Double(period))
                 convexitySum += pv * Double(period) * (Double(period) + 1)
             }
+        }
+
+        // Fractional trailing coupon, matching the price function's annuity treatment
+        if fractionalPeriod > 0 {
+            let pv = periodicCoupon * fractionalPeriod / pow(1 + periodicRate, totalPeriods)
+            convexitySum += pv * totalPeriods * (totalPeriods + 1)
         }
 
         // Add convexity for face value
@@ -808,45 +824,59 @@ class CalculationEngine {
         return npv
     }
     
-    /// Calculate Internal Rate of Return using bisection.
-    /// Returns `.nan` when the cash flows do not admit an IRR in (−99%, 1000%)
-    /// (e.g. all flows the same sign, or an empty series).
+    /// Calculate Internal Rate of Return using a bracket scan plus bisection.
+    /// Scans the interior of (−99%, 1000%) for a sign change, so non-conventional
+    /// cash flows with multiple IRRs return the lowest root in range.
+    /// Returns `.nan` when no root exists in that range.
     static func calculateIRR(cashFlows: [Double]) -> Double {
         guard cashFlows.contains(where: { $0 > 0 }),
               cashFlows.contains(where: { $0 < 0 }) else {
             return .nan
         }
 
-        var lowerRate = -0.99
-        var upperRate = 10.0
-        let tolerance = 1e-8
-        let maxIterations = 200
-
-        var npvLower = calculateNPV(cashFlows: cashFlows, discountRate: lowerRate * 100)
-        let npvUpper = calculateNPV(cashFlows: cashFlows, discountRate: upperRate * 100)
-
-        // Bisection requires a sign change across the bracket
-        guard npvLower.isFinite, npvUpper.isFinite, npvLower * npvUpper <= 0 else {
-            return .nan
+        func npv(_ rate: Double) -> Double {
+            calculateNPV(cashFlows: cashFlows, discountRate: rate * 100)
         }
 
-        for _ in 0..<maxIterations {
-            let midRate = (lowerRate + upperRate) / 2
-            let npvMid = calculateNPV(cashFlows: cashFlows, discountRate: midRate * 100)
+        // Scan for a sign change on a grid that is fine near zero and coarser above
+        var lowerRate = -0.99
+        var npvLower = npv(lowerRate)
+        var upperRate: Double? = nil
 
-            if abs(npvMid) < tolerance || abs(upperRate - lowerRate) < tolerance {
+        var probe = lowerRate
+        while probe < 10.0 {
+            let next = probe < 1.0 ? probe + 0.01 : probe + 0.25
+            let npvNext = npv(next)
+            if npvLower.isFinite, npvNext.isFinite, npvLower * npvNext <= 0 {
+                lowerRate = probe
+                upperRate = next
+                break
+            }
+            probe = next
+            npvLower = npvNext
+        }
+
+        guard var upperBound = upperRate else { return .nan }
+        npvLower = npv(lowerRate)
+
+        let tolerance = 1e-8
+        for _ in 0..<200 {
+            let midRate = (lowerRate + upperBound) / 2
+            let npvMid = npv(midRate)
+
+            if abs(npvMid) < tolerance || abs(upperBound - lowerRate) < tolerance {
                 return midRate * 100
             }
 
             if npvLower * npvMid <= 0 {
-                upperRate = midRate
+                upperBound = midRate
             } else {
                 lowerRate = midRate
                 npvLower = npvMid
             }
         }
 
-        return (lowerRate + upperRate) / 2 * 100
+        return (lowerRate + upperBound) / 2 * 100
     }
 
     /// Calculate Modified Internal Rate of Return.

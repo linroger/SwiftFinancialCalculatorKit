@@ -199,6 +199,10 @@ final class InvestmentCalculation {
             secondaryValues["Total Cash Inflows"] = cashFlows.reduce(0, +)
             secondaryValues["Discount Rate"] = discountRate
 
+            if let paybackPeriod = calculatePaybackPeriod() {
+                secondaryValues["Payback Period"] = paybackPeriod
+            }
+
             if npv > 0 {
                 explanation = irr.isFinite
                     ? "The investment is profitable with an IRR of \(String(format: "%.2f%%", irr))"

@@ -90,7 +90,8 @@ struct MathExpressionCalculatorView: View {
                 Button("Save") {
                     saveCalculation()
                 }
-                .disabled(result == nil)
+                .disabled(result == nil || calculationName.isEmpty)
+                .help(calculationName.isEmpty ? "Enter a calculation name to save" : "Save this calculation")
 
                 Button("Clear") {
                     clearAll()
@@ -151,6 +152,11 @@ struct MathExpressionCalculatorView: View {
                         .lineLimit(1...5)
                         .onSubmit {
                             evaluateExpression()
+                        }
+                        .onChange(of: expression) { _, _ in
+                            // A changed expression invalidates the displayed result
+                            result = nil
+                            errorMessage = nil
                         }
                 }
                 

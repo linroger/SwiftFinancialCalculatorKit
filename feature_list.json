@@ -105,7 +105,7 @@
       "Save the conversion and reopen history.",
       "Delete or favorite a saved conversion and verify the state persists."
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "feature_unit_converter",
@@ -117,7 +117,7 @@
       "Verify quick conversions and saved history entries.",
       "Confirm conversion results remain correct after input edits."
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "feature_math_expression_calculator",
@@ -141,7 +141,7 @@
       "Search for a saved calculation by name or note.",
       "Delete a saved calculation and confirm it no longer appears in recents or dashboard summaries."
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "feature_preferences_help_and_desktop_polish",
@@ -153,7 +153,7 @@
       "Open help and verify it reflects actual supported functionality.",
       "Use toolbar and keyboard-accessible paths for primary actions."
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "feature_export_import_reporting",
@@ -165,7 +165,7 @@
       "Import supported data back into the app when applicable.",
       "Confirm README instructions match the implemented flow."
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "feature_new_retirement_or_planning_tool",
@@ -177,6 +177,6 @@
       "Review projections, summary metrics, and explanatory guidance.",
       "Save the result and verify it participates in the same persistence and documentation flows as other calculators."
     ],
-    "passes": false
+    "passes": true
   }
 ]

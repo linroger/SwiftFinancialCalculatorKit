@@ -21,6 +21,8 @@ struct DashboardView: View {
     @Query(sort: \MathExpressionCalculation.lastModified, order: .reverse) private var recentMath: [MathExpressionCalculation]
     @Query(sort: \BondCalculation.lastModified, order: .reverse) private var recentBonds: [BondCalculation]
     @Query(sort: \DepreciationCalculation.lastModified, order: .reverse) private var recentDepreciation: [DepreciationCalculation]
+    @Query(sort: \RetirementPlanCalculation.lastModified, order: .reverse) private var recentRetirement: [RetirementPlanCalculation]
+    @Query(sort: \CurrencyConversionCalculation.lastModified, order: .reverse) private var recentCurrency: [CurrencyConversionCalculation]
     
     @State private var currentTime = Date()
     let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
@@ -145,7 +147,8 @@ struct DashboardView: View {
     
     private var totalCalculations: Int {
         recentTVM.count + recentLoans.count + recentInvestments.count + recentOptions.count
-            + recentMath.count + recentBonds.count + recentDepreciation.count
+            + recentMath.count + recentBonds.count + recentDepreciation.count + recentRetirement.count
+            + recentCurrency.count
     }
 
     private var calculationsThisWeek: Int {
@@ -158,6 +161,8 @@ struct DashboardView: View {
         count += recentMath.filter { $0.lastModified > weekAgo }.count
         count += recentBonds.filter { $0.lastModified > weekAgo }.count
         count += recentDepreciation.filter { $0.lastModified > weekAgo }.count
+        count += recentRetirement.filter { $0.lastModified > weekAgo }.count
+        count += recentCurrency.filter { $0.lastModified > weekAgo }.count
         return count
     }
 
@@ -170,6 +175,8 @@ struct DashboardView: View {
         count += recentMath.filter { $0.isFavorite }.count
         count += recentBonds.filter { $0.isFavorite }.count
         count += recentDepreciation.filter { $0.isFavorite }.count
+        count += recentRetirement.filter { $0.isFavorite }.count
+        count += recentCurrency.filter { $0.isFavorite }.count
         return count
     }
 
@@ -182,6 +189,8 @@ struct DashboardView: View {
         if !recentMath.isEmpty { categories.insert("Math") }
         if !recentBonds.isEmpty { categories.insert("Bonds") }
         if !recentDepreciation.isEmpty { categories.insert("Depreciation") }
+        if !recentRetirement.isEmpty { categories.insert("Retirement") }
+        if !recentCurrency.isEmpty { categories.insert("Currency") }
         return categories.count
     }
     
@@ -378,6 +387,32 @@ struct DashboardView: View {
                 result: item.result.formattedPrimaryValue,
                 icon: "arrow.down.right.circle",
                 calculationType: .depreciation,
+                calculationId: item.id
+            ))
+        }
+
+        for item in recentRetirement.prefix(5) {
+            items.append(ActivityItem(
+                id: item.id,
+                title: item.name,
+                subtitle: "Retirement Plan",
+                date: item.lastModified,
+                result: item.result.formattedPrimaryValue,
+                icon: "figure.walk.motion",
+                calculationType: .retirement,
+                calculationId: item.id
+            ))
+        }
+
+        for item in recentCurrency.prefix(5) {
+            items.append(ActivityItem(
+                id: item.id,
+                title: item.name,
+                subtitle: "Currency Conversion",
+                date: item.lastModified,
+                result: item.result.formattedPrimaryValue,
+                icon: "dollarsign.circle",
+                calculationType: .currency,
                 calculationId: item.id
             ))
         }
@@ -614,6 +649,8 @@ struct MarketOverviewView: View {
                             .foregroundColor(.secondary)
                     }
                     .buttonStyle(.plain)
+                    .help(isExpanded ? "Collapse market overview" : "Expand market overview")
+                    .accessibilityLabel(isExpanded ? "Collapse Market Overview" : "Expand Market Overview")
                 }
                 
                 if isExpanded {
@@ -622,7 +659,7 @@ struct MarketOverviewView: View {
                         Divider()
                         MarketMetric(name: "NASDAQ", value: "16,428.82", change: "+1.59%", isPositive: true, icon: "chart.bar.fill")
                         Divider()
-                        MarketMetric(name: "10Y Treasury", value: "4.42%", change: "-0.08%", isPositive: true, icon: "building.columns")
+                        MarketMetric(name: "10Y Treasury", value: "4.42%", change: "-0.08%", isPositive: false, icon: "building.columns")
                         Divider()
                         MarketMetric(name: "EUR/USD", value: "1.0856", change: "+0.24%", isPositive: true, icon: "dollarsign.circle")
                         Divider()

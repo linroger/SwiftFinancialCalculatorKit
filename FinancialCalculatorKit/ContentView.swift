@@ -62,6 +62,7 @@ struct SidebarView: View {
     @Query(sort: \MathExpressionCalculation.lastModified, order: .reverse) private var mathCalculations: [MathExpressionCalculation]
     @Query(sort: \DepreciationCalculation.lastModified, order: .reverse) private var depreciationCalculations: [DepreciationCalculation]
     @Query(sort: \CurrencyConversionCalculation.lastModified, order: .reverse) private var currencyCalculations: [CurrencyConversionCalculation]
+    @Query(sort: \RetirementPlanCalculation.lastModified, order: .reverse) private var retirementCalculations: [RetirementPlanCalculation]
 
     // Legacy support
     @Query private var legacyCalculations: [FinancialCalculation]
@@ -119,7 +120,9 @@ struct SidebarView: View {
                 Button(action: { viewModel.showFavoritesOnly.toggle() }) {
                     Image(systemName: viewModel.showFavoritesOnly ? "heart.fill" : "heart")
                 }
-                .help("Show favorites only")
+                .help(viewModel.showFavoritesOnly ? "Show all calculations" : "Show favorites only")
+                .accessibilityLabel("Toggle Favorites Filter")
+                .accessibilityIdentifier("toolbar.favoritesFilter")
             }
             
             ToolbarItemGroup(placement: .secondaryAction) {
@@ -225,6 +228,16 @@ struct SidebarView: View {
             ))
         }
 
+        for calc in retirementCalculations.prefix(3) {
+            items.append(RecentCalculationItem(
+                id: calc.id,
+                name: calc.name,
+                calculationType: .retirement,
+                lastModified: calc.lastModified,
+                isFavorite: calc.isFavorite
+            ))
+        }
+
         // Filter by search text if needed
         var filtered = items
         if !viewModel.searchText.isEmpty {
@@ -285,6 +298,10 @@ struct SidebarView: View {
             if let calc = currencyCalculations.first(where: { $0.id == item.id }) {
                 modelContext.delete(calc)
             }
+        case .retirement:
+            if let calc = retirementCalculations.first(where: { $0.id == item.id }) {
+                modelContext.delete(calc)
+            }
         case .conversion:
             break
         }
@@ -310,6 +327,8 @@ struct SidebarView: View {
             depreciationCalculations.first(where: { $0.id == item.id })?.toggleFavorite()
         case .currency:
             currencyCalculations.first(where: { $0.id == item.id })?.toggleFavorite()
+        case .retirement:
+            retirementCalculations.first(where: { $0.id == item.id })?.toggleFavorite()
         case .conversion:
             break
         }
@@ -381,6 +400,8 @@ struct DetailView: View {
                     TimeValueCalculatorView()
                 case .loan, .mortgage:
                     LoanCalculatorView()
+                case .retirement:
+                    RetirementPlannerView()
                 case .bond:
                     BondCalculatorView()
                 case .investment:
@@ -784,8 +805,8 @@ struct CalculatorHelpCard: View {
 struct FeaturesHelpContent: View {
     let features = [
         ("chart.line.uptrend.xyaxis", "Interactive Charts", "Visualize your financial data with dynamic charts that respond to input changes."),
-        ("dollarsign.circle", "Multi-Currency Support", "Work with 16+ currencies including USD, EUR, GBP, JPY, and more."),
-        ("square.and.arrow.up", "Export Options", "Export calculations to CSV, Excel, PDF, or JSON formats."),
+        ("dollarsign.circle", "Multi-Currency Support", "Work with 16 currencies including USD, EUR, GBP, JPY, and more."),
+        ("square.and.arrow.up", "CSV Export", "Export calculation results and schedules to CSV files."),
         ("clock.arrow.circlepath", "Calculation History", "Access your previous calculations quickly from the sidebar."),
         ("heart", "Favorites", "Mark frequently used calculations as favorites for quick access."),
         ("magnifyingglass", "Search", "Quickly find calculations using the search feature."),
@@ -908,11 +929,12 @@ struct AboutHelpContent: View {
                 
                 Text("• Time Value of Money calculations (PV, FV, PMT, Rate, Periods)")
                 Text("• Loan and mortgage analysis with amortization schedules")
+                Text("• Retirement planning with nest-egg projection and gap analysis")
                 Text("• Bond pricing and yield calculations")
                 Text("• Investment analysis (NPV, IRR, MIRR)")
                 Text("• Black-Scholes options pricing with Greeks")
                 Text("• Depreciation calculations (Straight-line, Declining balance, MACRS)")
-                Text("• Currency conversion with 16+ currencies")
+                Text("• Currency conversion with 16 currencies")
                 Text("• Unit conversion for international calculations")
                 Text("• Mathematical expression evaluator")
             }

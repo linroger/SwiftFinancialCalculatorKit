@@ -59,8 +59,12 @@ enum TVMAnalysisEngine {
         guard annualRate >= 0, years > 0, years.isFinite, annualRate.isFinite else { return nil }
 
         let effectiveAnnualRate = pow(1 + (annualRate / 100 / paymentFrequency.periodsPerYear), paymentFrequency.periodsPerYear) - 1
-        // Cap the simulated series so extreme horizons stay renderable
-        let periods = min(max(Int(paymentFrequency.numberOfPeriods(from: years).rounded()), 1), 1200)
+        // Simulate the FULL horizon (clamped only against absurd inputs so the
+        // Int conversion can't trap), but plot at most ~1200 points by striding.
+        let requestedPeriods = paymentFrequency.numberOfPeriods(from: years).rounded()
+        guard requestedPeriods.isFinite else { return nil }
+        let periods = Int(min(max(requestedPeriods, 1), 120_000))
+        let plotStride = max(1, periods / 1200)
         let ratePerPeriod = annualRate / 100 / paymentFrequency.periodsPerYear
 
         var growthTimeline: [ChartDataPoint] = [
@@ -86,16 +90,18 @@ enum TVMAnalysisEngine {
                 cumulativePrincipal += resolvedPayment
             }
 
-            let year = paymentFrequency.yearsFromPeriods(Double(period))
-            growthTimeline.append(
-                ChartDataPoint(x: year, y: balance, label: "Year \(String(format: "%.1f", year))")
-            )
-            contributionTimeline.append(
-                ChartDataPoint(x: year, y: cumulativePrincipal, label: "Principal \(String(format: "%.1f", year))")
-            )
+            if period % plotStride == 0 || period == periods {
+                let year = paymentFrequency.yearsFromPeriods(Double(period))
+                growthTimeline.append(
+                    ChartDataPoint(x: year, y: balance, label: "Year \(String(format: "%.1f", year))")
+                )
+                contributionTimeline.append(
+                    ChartDataPoint(x: year, y: cumulativePrincipal, label: "Principal \(String(format: "%.1f", year))")
+                )
+            }
         }
 
-        let endBalance = growthTimeline.last?.y ?? resolvedFutureValue
+        let endBalance = balance
         let totalScheduledPayments = resolvedPayment * Double(periods)
         let interestEarned = endBalance - cumulativePrincipal
         let netGrowth = endBalance - resolvedPresentValue

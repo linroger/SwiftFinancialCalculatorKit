@@ -34,15 +34,19 @@ enum CalculationExporter {
             return false
         }
 
+        let csv = csvString(headers: headers, rows: rows)
+        try csv.write(to: url, atomically: true, encoding: .utf8)
+        return true
+    }
+
+    /// Build the CSV text for the given headers and rows (separately testable).
+    static func csvString(headers: [String], rows: [[String: String]]) -> String {
         var lines: [String] = [headers.map(escape).joined(separator: ",")]
         for row in rows {
             let line = headers.map { escape(row[$0] ?? "") }.joined(separator: ",")
             lines.append(line)
         }
-
-        let csv = lines.joined(separator: "\n") + "\n"
-        try csv.write(to: url, atomically: true, encoding: .utf8)
-        return true
+        return lines.joined(separator: "\n") + "\n"
     }
 
     /// Export a calculation summary (primary value plus secondary values),

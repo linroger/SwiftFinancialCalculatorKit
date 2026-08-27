@@ -266,6 +266,9 @@ final class TimeValueCalculation {
         if let years = numberOfYears, years <= 0 {
             errors.append("Number of years must be positive")
         }
+        if let years = numberOfYears, years > 1000 {
+            errors.append("Number of years must be 1000 or less")
+        }
 
         return errors
     }
@@ -349,8 +352,9 @@ final class TimeValueCalculation {
         let totalPeriods = paymentFrequency.numberOfPeriods(from: years)
         guard totalPeriods.isFinite, totalPeriods > 0 else { return [] }
 
-        // Cap the series so very long horizons stay renderable
-        let periods = min(Int(totalPeriods.rounded()), 1200)
+        // Clamp BEFORE the Int conversion (a huge Double would trap), and cap
+        // the series so very long horizons stay renderable
+        let periods = Int(min(totalPeriods.rounded(), 1200))
         let r = paymentFrequency.periodRate(from: rate) / 100
         let pv = presentValue ?? 0.0
         let pmt = payment ?? 0.0
