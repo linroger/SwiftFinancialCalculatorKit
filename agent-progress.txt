@@ -52,3 +52,18 @@ Next Steps
 - Repair dashboard content and quick actions so the landing screen only promises what the app actually implements.
 - Implement real preference persistence plus recent/favorite/delete flows across saved calculations.
 - Keep `./script/build_and_run.sh --verify` and the shell UI smoke green while moving into the next slice.
+
+- 2026-08-27 21:25 UTC
+  Branch: main (fresh isolated git repository initialized in the project root; the enclosing home-directory repo has a broken HEAD and was left untouched)
+  Feature or bug worked on: full audit-and-repair pass across engine, models, views, components, and project file
+  Files touched: CalculationEngine.swift, TimeValueAnalytics.swift, ExchangeRateService.swift, all 9 calculation models, all 9 calculator views, OptionsAnalyticsSheets.swift, ContentView.swift, DashboardView.swift, MainViewModel.swift, Formatters.swift, Currency.swift, InputFieldView.swift, ResultDisplayView.swift, FinancialChartView.swift, FinancialStyles.swift, new Utilities/CalculationExporter.swift, project.pbxproj, FinancialCalculatorKitTests.swift, FinancialCalculatorKitUITests.swift; deleted unused Item.swift
+  Summary:
+  Ran three parallel code audits (~90 findings), fixed all critical/major defects: Black-Scholes CDF missing /sqrt(2), loan payment at 100x rate, TVM solver sign conventions and unsolvable-target handling, 1...0 range crashes, IRR/YTM bracket validation, MIRR implementation, expression variables ignored, identity temperature conversion, fabricated currency rates, no-op preferences/save/delete/export flows, MACRS and declining-balance schedule correctness, dashboard honesty and completeness, and pbxproj corruption (missing unit-test product reference, duplicate compile entries).
+  Tests and verification:
+  xcodebuild build succeeds with zero project warnings (DEVELOPER_DIR=Xcode-beta.app, -skipMacroValidation required on this machine).
+  xcodebuild test (unit target): 25/25 tests pass, including textbook Black-Scholes 10.4506 ATM value, $1,798.65 mortgage payment with $347,514.57 total interest, IRR 23.375% and MIRR 18.29% hand-checks, TVM solver round-trips, bond YTM/price round-trip, zero-rate bond pricing, DDB-to-SL crossover reaching salvage, fractional-life and short-maturity crash regressions, expression-variable resolution, and preferences UserDefaults round-trip.
+  UI tests: hardened sheet-dismissal waits; this headless CLI session intermittently loses UI-testing authorization ("Not authorized for performing UI testing actions"), so UI smoke needs a GUI session to confirm.
+  Result:
+  Engine/model correctness repaired and regression-locked. 9 of 15 features now passing in feature_list.json.
+  Remaining follow-ups / known issues:
+  Currency and unit converter flows verified by review and build only (no automated tests); export/import feature needs an interactive verification of the NSSavePanel flow; the new planning tool (feature_new_retirement_or_planning_tool) is still unbuilt; UI tests need a GUI session.

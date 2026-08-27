@@ -1,8 +1,8 @@
 # Handoff.md
 
-**Last Updated (UTC):** 2026-04-13 20:43:07 UTC
+**Last Updated (UTC):** 2026-08-27 21:20 UTC
 **Status:** In Progress
-**Current Focus:** Move from shell stabilization into truthful dashboard and shared persistence repairs without regressing the now-working macOS app shell.
+**Current Focus:** Core repair pass complete — engine math, persistence, honesty, and crash fixes are in with a green build and 25 passing unit tests. Remaining: currency/unit converter runtime verification, README refresh, and the new planning tool.
 
 ## 1) Request & Context
 - **User’s request (quoted or paraphrased):** Read the macOS app codebase recursively, understand every Swift file, map how the app fits together, then drive the app from its current broken and incomplete state toward a complete, polished, shippable macOS release with improved UI, fixed bugs, additional calculations, updated README, and a pushed GitHub state.
@@ -13,6 +13,7 @@
   - 2026-04-13 UTC: Initial investigation confirmed the codebase compiled with `swift build` and `xcodebuild ... build`, but the app had architectural debt, unfinished flows, misleading UI copy, duplicate Xcode project membership, no meaningful tests, and no continuity harness.
   - 2026-04-13 UTC: Harness files and deterministic run scripts were added.
   - 2026-04-13 UTC: The corrupted Xcode project source phases were cleaned up, the app shell was refactored to use single-sheet routing, and shell-focused unit/UI tests were added and passed.
+  - 2026-08-27 UTC: Full audit-and-repair pass. Three parallel audits surfaced ~90 defects; all critical and major ones were fixed. Highlights: the Black-Scholes normal CDF was missing the `/√2` (all option prices ~28% high — verified against the textbook 10.4506 ATM value); loan payments were computed at 100× the periodic rate (a $300k/6%/30y mortgage now correctly yields $1,798.65/mo); TVM solvers were rebuilt on the consistent goal convention `FV = PV(1+r)^n + PMT·s` with a bracketed bisection rate solver and closed-form N that no longer ignores FV; several `1...0` range crashes (short bond maturities, fractional depreciation life), zero-rate bond pricing, and NaN pie-chart traps were guarded; IRR/YTM now validate their brackets and report "no solution" instead of fake midpoints; MIRR was implemented (it was advertised but absent); math-expression variables are now actually passed to MathParser; temperature conversion was an identity function and is now a proper affine conversion; the currency converter no longer fabricates 1.0 rates or claims "Live" on fallback data; preferences now genuinely persist via UserDefaults; sidebar delete/favorite work; CSV export via NSSavePanel replaced three dead Export menus; declining-balance depreciation now switches to straight-line so book value reaches salvage; MACRS schedules include the half-year tail and honor the user's rate/class; the dashboard counts bonds/depreciation/currency and labels the market section "Sample Data"; the project file's missing unit-test product reference (which broke `xcodebuild test`) was restored and duplicate compile entries removed. The project now has its own isolated git repository (the enclosing home-directory repo has a broken HEAD and was left untouched). Environment note: this machine only has Xcode-beta (Xcode 27); builds require `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer` and `-skipMacroValidation`.
 
 ## 2) Requirements → Acceptance Checks (traceable)
 | Requirement | Acceptance Check (scenario steps) | Expected Outcome | Evidence to Capture |
@@ -106,6 +107,7 @@
   3. Add scenario tests for those shared flows before moving into calculator-specific math audits.
 
 ## 10) Updates to This File (append-only)
+- 2026-08-27 21:30 UTC: Recorded the full audit-and-repair pass (engine math, persistence, honesty, crash guards, pbxproj repair), evidence (green build, 25/25 unit tests including textbook-value checks), the new isolated git repository, the Xcode-beta/`-skipMacroValidation` environment requirement, and the UI-testing authorization limitation of headless sessions. Remaining: converter runtime verification, interactive export check, new planning tool.
 - 2026-04-13 20:09:17 UTC: Created initial handoff with architecture findings, build evidence, major risks, and the first stabilization roadmap.
 - 2026-04-13 20:09:17 UTC: Updated handoff after creating the harness, validating `init.sh`, reading the main calculator surfaces, and discovering that `build_and_run.sh --verify` fails because of a polluted Xcode project source graph.
 - 2026-04-13 20:43:07 UTC: Updated handoff after cleaning the Xcode project source phases, refactoring shell sheet routing, adding shell-focused unit and UI tests, verifying `xcodebuild ... test`, and confirming `./script/build_and_run.sh --verify` launches the app successfully.

@@ -21,7 +21,7 @@
       "Trigger a quick action and confirm it routes to the intended calculator.",
       "Verify any market or activity surfaces clearly reflect real or mock data truthfully."
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "feature_time_value_calculator",
@@ -33,7 +33,7 @@
       "Run the calculation and verify the result and explanation.",
       "Confirm chart data and validation errors behave correctly."
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "feature_loan_mortgage_calculator",
@@ -45,7 +45,7 @@
       "Verify payment summary, amortization schedule, and payoff insights.",
       "Confirm editing inputs updates results consistently."
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "feature_bond_calculator",
@@ -57,7 +57,7 @@
       "Enter face value, coupon, maturity, and market inputs.",
       "Verify result, supporting metrics, and chart/table outputs."
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "feature_investment_analysis_calculator",
@@ -69,7 +69,7 @@
       "Run NPV, IRR, and combined analysis modes.",
       "Verify the supporting analysis views use the same underlying data correctly."
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "feature_options_pricing_calculator",
@@ -81,7 +81,7 @@
       "Verify the premium and Greeks are generated.",
       "Confirm any analysis view is implemented and not labeled as a placeholder."
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "feature_depreciation_calculator",
@@ -93,7 +93,7 @@
       "Run each supported method and verify the current-year result.",
       "Review schedule and comparison outputs for correctness."
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "feature_currency_converter",
@@ -129,7 +129,7 @@
       "Evaluate the expression and verify the result uses the supplied variables.",
       "Save or recall the expression from history."
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "feature_persistence_favorites_history",
