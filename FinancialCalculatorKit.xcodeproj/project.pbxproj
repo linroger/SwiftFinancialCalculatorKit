@@ -7,16 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		4232EA1B4BE060D21B43EBC2 /* FinancialCalculatorKitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07C660C5AAA61161B04F4BBD /* FinancialCalculatorKitTests.swift */; };
-		5E0EB51829AB77411E2E7E5E /* OptionsAnalyticsSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1573BEFFEAE7DBB4FCC54CB /* OptionsAnalyticsSheets.swift */; };
-		72B39ED534BD3F71DA829600 /* FinancialCalculatorKitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07C660C5AAA61161B04F4BBD /* FinancialCalculatorKitTests.swift */; };
 		A74BDCE62DF70C1F0027A66B /* MathParser in Frameworks */ = {isa = PBXBuildFile; productRef = A74BDCE52DF70C1F0027A66B /* MathParser */; };
 		A74BDCE92DF70C2D0027A66B /* ComplexModule in Frameworks */ = {isa = PBXBuildFile; productRef = A74BDCE82DF70C2D0027A66B /* ComplexModule */; };
 		A74BDCEB2DF70C2D0027A66B /* Numerics in Frameworks */ = {isa = PBXBuildFile; productRef = A74BDCEA2DF70C2D0027A66B /* Numerics */; };
 		A74BDCED2DF70C2D0027A66B /* RealModule in Frameworks */ = {isa = PBXBuildFile; productRef = A74BDCEC2DF70C2D0027A66B /* RealModule */; };
 		A74BDCF02DF70C5A0027A66B /* LaTeXSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = A74BDCEF2DF70C5A0027A66B /* LaTeXSwiftUI */; };
-		B7B2D3753A07D2016D8831F4 /* OptionsCalculatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C4F6B92A1130D1052226BC7 /* OptionsCalculatorView.swift */; };
-		C7D32C7A98FC94B85FE78091 /* FinancialCalculatorKitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07C660C5AAA61161B04F4BBD /* FinancialCalculatorKitTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -68,7 +63,6 @@
 		076C6B9062E0A5A27D75E711 /* index.js */ = {isa = PBXFileReference; explicitFileType = sourcecode.javascript; name = index.js; path = .derivedData/Build/Products/Debug/FinancialCalculatorKit.app/Contents/Resources/MathJaxSwift_MathJaxSwift.bundle/Contents/Resources/mjn/index.js; sourceTree = SOURCE_ROOT; };
 		078C50C5616A1277BC5C8BB2 /* unaryfunctionmap.json */ = {isa = PBXFileReference; explicitFileType = text.json; name = unaryfunctionmap.json; path = ".derivedData/SourcePackages/checkouts/swift-math-parser/docs/data/documentation/mathparser/mathparser/unaryfunctionmap.json"; sourceTree = SOURCE_ROOT; };
 		07B2D36F840B810CB82B89F4 /* SwiftDrawDOM.abi.json */ = {isa = PBXFileReference; explicitFileType = text.json; name = SwiftDrawDOM.abi.json; path = ".derivedData/Build/Intermediates.noindex/SwiftDraw.build/Debug/SwiftDrawDOM.build/Objects-normal/arm64/SwiftDrawDOM.abi.json"; sourceTree = SOURCE_ROOT; };
-		07C660C5AAA61161B04F4BBD /* FinancialCalculatorKitTests.swift */ = {isa = PBXFileReference; explicitFileType = sourcecode.swift; lastKnownFileType = sourcecode.swift; name = FinancialCalculatorKitTests.swift; path = FinancialCalculatorKitTests/FinancialCalculatorKitTests.swift; sourceTree = SOURCE_ROOT; };
 		082EEE4DB9BED848CE2990A0 /* EffectfulPropertiesTests.swift */ = {isa = PBXFileReference; explicitFileType = sourcecode.swift; name = EffectfulPropertiesTests.swift; path = ".derivedData/SourcePackages/checkouts/swift-syntax/Tests/SwiftParserTest/translated/EffectfulPropertiesTests.swift"; sourceTree = SOURCE_ROOT; };
 		08AE146C9A6117EA8115D304 /* BraceRecoveryEofTests.swift */ = {isa = PBXFileReference; explicitFileType = sourcecode.swift; name = BraceRecoveryEofTests.swift; path = ".derivedData/SourcePackages/checkouts/swift-syntax/Tests/SwiftParserTest/translated/BraceRecoveryEofTests.swift"; sourceTree = SOURCE_ROOT; };
 		093584B711252199299203D8 /* RawStringErrorsTests.swift */ = {isa = PBXFileReference; explicitFileType = sourcecode.swift; name = RawStringErrorsTests.swift; path = ".derivedData/SourcePackages/checkouts/swift-syntax/Tests/SwiftParserTest/translated/RawStringErrorsTests.swift"; sourceTree = SOURCE_ROOT; };
@@ -529,7 +523,6 @@
 		7C24B0017FBA01B868C5409E /* manifest.json */ = {isa = PBXFileReference; explicitFileType = text.json; lastKnownFileType = text.json; name = manifest.json; path = ".derivedData/Build/Intermediates.noindex/XCBuildData/buildDebugging-1776182480.999775/current-manifest.swiftbuilddata/manifest.json"; sourceTree = SOURCE_ROOT; };
 		7C4A98B85AE2B05FB0A5E876 /* SourcePresence.swift */ = {isa = PBXFileReference; explicitFileType = sourcecode.swift; name = SourcePresence.swift; path = ".derivedData/SourcePackages/checkouts/swift-syntax/Sources/SwiftSyntax/SourcePresence.swift"; sourceTree = SOURCE_ROOT; };
 		7C4EDC83CE7024218F436CB8 /* RawSyntaxLayoutView.swift */ = {isa = PBXFileReference; explicitFileType = sourcecode.swift; name = RawSyntaxLayoutView.swift; path = ".derivedData/SourcePackages/checkouts/swift-syntax/Sources/SwiftSyntax/Raw/RawSyntaxLayoutView.swift"; sourceTree = SOURCE_ROOT; };
-		7C4F6B92A1130D1052226BC7 /* OptionsCalculatorView.swift */ = {isa = PBXFileReference; explicitFileType = sourcecode.swift; name = OptionsCalculatorView.swift; path = FinancialCalculatorKit/Views/Calculator/OptionsCalculatorView.swift; sourceTree = SOURCE_ROOT; };
 		7C5E7640209AF4940674741C /* GettinStarted.md */ = {isa = PBXFileReference; explicitFileType = net.daringfireball.markdown; name = GettinStarted.md; path = ".derivedData/SourcePackages/checkouts/swift-math-parser/Sources/MathParser/Documentation.docc/GettinStarted.md"; sourceTree = SOURCE_ROOT; };
 		7CA957F14E98E86F003E845D /* main.swift */ = {isa = PBXFileReference; explicitFileType = sourcecode.swift; name = main.swift; path = ".derivedData/SourcePackages/checkouts/swift-parsing/Sources/swift-parsing-benchmark/main.swift"; sourceTree = SOURCE_ROOT; };
 		7CD2C95321EC06A2808EF499 /* Lookahead.swift */ = {isa = PBXFileReference; explicitFileType = sourcecode.swift; name = Lookahead.swift; path = ".derivedData/SourcePackages/checkouts/swift-syntax/Sources/SwiftParser/Lookahead.swift"; sourceTree = SOURCE_ROOT; };
@@ -694,6 +687,7 @@
 		A70BC18F8B046BEA5AADAA65 /* README.md */ = {isa = PBXFileReference; explicitFileType = net.daringfireball.markdown; name = README.md; path = ".derivedData/SourcePackages/checkouts/xctest-dynamic-overlay/README.md"; sourceTree = SOURCE_ROOT; };
 		A7203291325A69871FBED1B4 /* SwiftIDEUtils.abi.json */ = {isa = PBXFileReference; explicitFileType = text.json; name = SwiftIDEUtils.abi.json; path = ".derivedData/SourcePackages/prebuilts/swift-syntax/601.0.1/swiftlang-6.2.4.1.4-MacroSupport-macos_aarch64/Modules/SwiftIDEUtils.abi.json"; sourceTree = SOURCE_ROOT; };
 		A74BDC752DF70A740027A66B /* FinancialCalculatorKit.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FinancialCalculatorKit.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A74BDC852DF70A760027A66B /* FinancialCalculatorKitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FinancialCalculatorKitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A74BDC8F2DF70A760027A66B /* FinancialCalculatorKitUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FinancialCalculatorKitUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A7B5F4A6DD8E7927953E1902 /* SwiftSyntaxDevUtils.swift */ = {isa = PBXFileReference; explicitFileType = sourcecode.swift; name = SwiftSyntaxDevUtils.swift; path = ".derivedData/SourcePackages/checkouts/swift-syntax/SwiftSyntaxDevUtils/Sources/swift-syntax-dev-utils/SwiftSyntaxDevUtils.swift"; sourceTree = SOURCE_ROOT; };
 		A7E51859C007DBC47982EC96 /* SVG.swift */ = {isa = PBXFileReference; explicitFileType = sourcecode.swift; name = SVG.swift; path = .derivedData/SourcePackages/checkouts/LaTeXSwiftUI/Sources/LaTeXSwiftUI/Models/SVG.swift; sourceTree = SOURCE_ROOT; };
@@ -731,7 +725,6 @@
 		B04113AFC16FE12C4D2D40E0 /* Package.swift */ = {isa = PBXFileReference; explicitFileType = sourcecode.swift; name = Package.swift; path = .derivedData/SourcePackages/checkouts/SwiftDraw/Package.swift; sourceTree = SOURCE_ROOT; };
 		B04340D3EF2AF5236A83F55B /* SwiftDrawDOM-OutputFileMap.json */ = {isa = PBXFileReference; explicitFileType = text.json; name = "SwiftDrawDOM-OutputFileMap.json"; path = ".derivedData/Build/Intermediates.noindex/SwiftDraw.build/Debug/SwiftDrawDOM.build/Objects-normal/arm64/SwiftDrawDOM-OutputFileMap.json"; sourceTree = SOURCE_ROOT; };
 		B125B5404FF63F1A1A78C05A /* RawSyntaxNodesOP.swift */ = {isa = PBXFileReference; explicitFileType = sourcecode.swift; name = RawSyntaxNodesOP.swift; path = ".derivedData/SourcePackages/checkouts/swift-syntax/Sources/SwiftSyntax/generated/raw/RawSyntaxNodesOP.swift"; sourceTree = SOURCE_ROOT; };
-		B1573BEFFEAE7DBB4FCC54CB /* OptionsAnalyticsSheets.swift */ = {isa = PBXFileReference; explicitFileType = sourcecode.swift; lastKnownFileType = sourcecode.swift; name = OptionsAnalyticsSheets.swift; path = FinancialCalculatorKit/Views/Calculator/OptionsAnalyticsSheets.swift; sourceTree = SOURCE_ROOT; };
 		B1BCB3B37B4BC88D0CB219A8 /* Assertions.swift */ = {isa = PBXFileReference; explicitFileType = sourcecode.swift; name = Assertions.swift; path = ".derivedData/SourcePackages/checkouts/swift-syntax/Tests/SwiftLexicalLookupTest/Assertions.swift"; sourceTree = SOURCE_ROOT; };
 		B22FCE35167E45FCA5FA19AA /* InferIndentation.swift */ = {isa = PBXFileReference; explicitFileType = sourcecode.swift; name = InferIndentation.swift; path = ".derivedData/SourcePackages/checkouts/swift-syntax/Sources/SwiftBasicFormat/InferIndentation.swift"; sourceTree = SOURCE_ROOT; };
 		B23B988C2070A4CF5F91735B /* highlight-js-perl.757d7b6f.js */ = {isa = PBXFileReference; explicitFileType = sourcecode.javascript; name = "highlight-js-perl.757d7b6f.js"; path = ".derivedData/SourcePackages/checkouts/swift-math-parser/docs/js/highlight-js-perl.757d7b6f.js"; sourceTree = SOURCE_ROOT; };
@@ -1082,7 +1075,6 @@
 				D82E4DF92F526568657DA620 /* DashboardView.swift */,
 				F3D4FDF2DBEB726B80FB8B21 /* ContentView.swift */,
 				3DFA61A043F437B325920AFF /* MathExpressionCalculatorView.swift */,
-				7C4F6B92A1130D1052226BC7 /* OptionsCalculatorView.swift */,
 				E62CFE869D15321DE8CCA6E0 /* CalculationEngine.swift */,
 				3BAE13578217895CB9C495E0 /* PLANS.md */,
 				804B7B47BF049CDD969A757C /* handoff.md */,
@@ -1973,7 +1965,6 @@
 				428CD9556153059DD55AC0A4 /* arm64-apple-macos.abi.json */,
 				737D3F6447385A41A266498E /* MathJaxSwift.abi.json */,
 				132B3681082685B624D871D3 /* arm64-apple-macos.abi.json */,
-				B1573BEFFEAE7DBB4FCC54CB /* OptionsAnalyticsSheets.swift */,
 				4AAC53A40D0D93D94A21EA3E /* A00AA5FC-7CFF-4151-B95B-053510E91629.txt */,
 				F1520E9DDBF6FF3C687A5840 /* manifest.json */,
 				2A7F369821DB33CC1D0D90E7 /* manifest.json */,
@@ -2027,7 +2018,6 @@
 				9CD6A03A8524AFA7A54E973F /* svg.bundle.js.LICENSE.txt */,
 				940ACC22B7E0917F6F64F181 /* StandardOutputAndStandardError.txt */,
 				5FDA26DEC7204107B0E0355C /* StandardOutputAndStandardError.txt */,
-				07C660C5AAA61161B04F4BBD /* FinancialCalculatorKitTests.swift */,
 				EB2C6BBF2B5164DA9EB8BCA0 /* target-graph.txt */,
 				4997E4C2890988B3CC74D093 /* Info.plist */,
 				6EBC1C4378FBA5B6BB18662C /* 35E46570-3024-44D3-98C5-85583F220A9F.txt */,
@@ -2069,6 +2059,7 @@
 			isa = PBXGroup;
 			children = (
 				A74BDC752DF70A740027A66B /* FinancialCalculatorKit.app */,
+				A74BDC852DF70A760027A66B /* FinancialCalculatorKitTests.xctest */,
 				A74BDC8F2DF70A760027A66B /* FinancialCalculatorKitUITests.xctest */,
 			);
 			name = Products;
@@ -2124,7 +2115,7 @@
 			packageProductDependencies = (
 			);
 			productName = FinancialCalculatorKitTests;
-			productReference = A74BDC852DF70A760027A66B;
+			productReference = A74BDC852DF70A760027A66B /* FinancialCalculatorKitTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 		A74BDC8E2DF70A760027A66B /* FinancialCalculatorKitUITests */ = {
@@ -2228,8 +2219,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B7B2D3753A07D2016D8831F4 /* OptionsCalculatorView.swift in Sources */,
-				5E0EB51829AB77411E2E7E5E /* OptionsAnalyticsSheets.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2237,7 +2226,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				4232EA1B4BE060D21B43EBC2 /* FinancialCalculatorKitTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2245,8 +2233,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C7D32C7A98FC94B85FE78091 /* FinancialCalculatorKitTests.swift in Sources */,
-				72B39ED534BD3F71DA829600 /* FinancialCalculatorKitTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

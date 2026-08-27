@@ -27,7 +27,7 @@ struct FinancialGroupBoxStyle: GroupBoxStyle {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.2), lineWidth: 1) // Subtle highlight
+                .stroke(Color(NSColor.separatorColor).opacity(0.6), lineWidth: 1)
         )
     }
 }
@@ -55,7 +55,7 @@ struct DetailRow: View {
             Text(value)
                 .font(.system(.body, design: .monospaced))
                 .fontWeight(isHighlighted ? .bold : .medium)
-                .foregroundColor(isHighlighted ? .primary : .primary)
+                .foregroundColor(isHighlighted ? .accentColor : .primary)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(
@@ -141,8 +141,7 @@ struct FinancialCardStyle: ViewModifier {
             .padding(padding)
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(NSColor.controlBackgroundColor).opacity(0.8))
-                    .background(.ultraThinMaterial) // Glassmorphism effect
+                    .fill(.ultraThinMaterial)
                     .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
             )
     }

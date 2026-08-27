@@ -8,7 +8,7 @@
 import SwiftUI
 import SwiftData
 
-/// Currency converter with real-time exchange rates
+/// Currency converter backed by daily reference exchange rates
 struct CurrencyConverterView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(MainViewModel.self) private var mainViewModel
@@ -76,18 +76,18 @@ struct CurrencyConverterView: View {
                         .font(.largeTitle)
                         .fontWeight(.bold)
                     
-                    Text("Convert between major world currencies with real-time exchange rates")
+                    Text("Convert between major world currencies using daily reference rates")
                         .font(.body)
                         .foregroundColor(.secondary)
                 }
-                
+
                 Spacer()
-                
+
                 VStack(alignment: .trailing, spacing: 4) {
                     if isLoading {
                         ProgressView()
                             .scaleEffect(0.8)
-                    } else if usingFallbackRates {
+                    } else if usingFallbackRates || liveRates.isEmpty {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundColor(.orange)
                     } else {
@@ -233,12 +233,18 @@ struct CurrencyConverterView: View {
                         .font(.headline)
                         .foregroundColor(.secondary)
                     
-                    Text("\(toCurrency.symbol)\(Formatters.decimalFormatter(decimalPlaces: 2).string(from: NSNumber(value: convertedAmount)) ?? "0.00")")
-                        .font(.system(size: 36, weight: .bold, design: .rounded))
-                        .foregroundColor(.primary)
-                    
+                    if exchangeRate > 0 {
+                        Text("\(toCurrency.symbol)\(Formatters.decimalFormatter(decimalPlaces: 2).string(from: NSNumber(value: convertedAmount)) ?? "0.00")")
+                            .font(.system(size: 36, weight: .bold, design: .rounded))
+                            .foregroundColor(.primary)
+                    } else {
+                        Text("Rate unavailable")
+                            .font(.system(size: 28, weight: .semibold, design: .rounded))
+                            .foregroundColor(.secondary)
+                    }
+
                     HStack {
-                        Text("1 \(fromCurrency.rawValue) = \(String(format: "%.4f", exchangeRate)) \(toCurrency.rawValue)")
+                        Text("1 \(fromCurrency.rawValue) = \(rateText) \(toCurrency.rawValue)")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -258,23 +264,25 @@ struct CurrencyConverterView: View {
                     
                     DetailRow(
                         title: "Exchange Rate",
-                        value: "1 \(fromCurrency.rawValue) = \(String(format: "%.4f", exchangeRate)) \(toCurrency.rawValue)"
+                        value: "1 \(fromCurrency.rawValue) = \(rateText) \(toCurrency.rawValue)"
                     )
-                    
+
                     Divider()
-                    
+
                     DetailRow(
                         title: "Converted Amount",
-                        value: "\(toCurrency.symbol)\(Formatters.decimalFormatter(decimalPlaces: 2).string(from: NSNumber(value: convertedAmount)) ?? "0.00")",
+                        value: exchangeRate > 0
+                            ? "\(toCurrency.symbol)\(Formatters.decimalFormatter(decimalPlaces: 2).string(from: NSNumber(value: convertedAmount)) ?? "0.00")"
+                            : "—",
                         isHighlighted: true
                     )
-                    
+
                     // Reverse conversion
                     Divider()
-                    
+
                     DetailRow(
                         title: "Reverse Rate",
-                        value: "1 \(toCurrency.rawValue) = \(String(format: "%.4f", 1.0 / exchangeRate)) \(fromCurrency.rawValue)"
+                        value: "1 \(toCurrency.rawValue) = \(reverseRateText) \(fromCurrency.rawValue)"
                     )
 
                     Divider()
@@ -299,6 +307,7 @@ struct CurrencyConverterView: View {
                 saveConversion()
             }
             .buttonStyle(.borderedProminent)
+            .disabled(exchangeRate <= 0)
             .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity)
@@ -317,7 +326,7 @@ struct CurrencyConverterView: View {
                         .fontWeight(.semibold)
                 }
                 
-                Text(usingFallbackRates ? "Live rates are temporarily unavailable, so the converter is showing a fallback estimate. Refresh to retry the real provider." : "Rates are fetched from a live market-data provider and cached until the next provider refresh window.")
+                Text(usingFallbackRates ? "The rate provider is temporarily unavailable, so the converter is showing a fallback estimate where one exists. Refresh to retry the provider." : "Rates are daily reference rates from the provider, cached until its next refresh window. They are indicative, not tradable quotes.")
                     .font(.body)
                     .foregroundColor(.secondary)
                 
@@ -360,10 +369,17 @@ struct CurrencyConverterView: View {
                         }
                         
                         Spacer()
-                        
-                        Text(String(format: "%.4f", currentRate(for: currency)))
-                            .font(.system(.body, design: .monospaced))
-                            .fontWeight(.medium)
+
+                        if let rate = currentRate(for: currency) {
+                            Text(String(format: "%.4f", rate))
+                                .font(.system(.body, design: .monospaced))
+                                .fontWeight(.medium)
+                        } else {
+                            Text("—")
+                                .font(.system(.body, design: .monospaced))
+                                .foregroundColor(.secondary)
+                                .help("No rate available for this currency")
+                        }
                     }
                     .padding(12)
                     .background(
@@ -418,11 +434,24 @@ struct CurrencyConverterView: View {
         .groupBoxStyle(FinancialGroupBoxStyle())
     }
 
-    private func recalculateConvertedAmount() {
-        exchangeRate = currentRate(for: toCurrency)
-        convertedAmount = amount * exchangeRate
+    private var rateText: String {
+        exchangeRate > 0 ? String(format: "%.4f", exchangeRate) : "—"
     }
-    
+
+    private var reverseRateText: String {
+        exchangeRate > 0 ? String(format: "%.4f", 1.0 / exchangeRate) : "—"
+    }
+
+    private func recalculateConvertedAmount() {
+        if let rate = currentRate(for: toCurrency), rate > 0 {
+            exchangeRate = rate
+            convertedAmount = amount * rate
+        } else {
+            exchangeRate = 0
+            convertedAmount = 0
+        }
+    }
+
     private func swapCurrencies() {
         withAnimation(.easeInOut(duration: 0.3)) {
             let temp = fromCurrency
@@ -434,7 +463,10 @@ struct CurrencyConverterView: View {
         }
     }
     
-    private func currentRate(for currency: Currency) -> Double {
+    /// The current rate for one unit of `fromCurrency` in `currency`.
+    /// `nil` when no live rate is loaded and no fallback estimate exists —
+    /// callers must show "unavailable" rather than a fabricated number.
+    private func currentRate(for currency: Currency) -> Double? {
         if currency == fromCurrency {
             return 1.0
         }
@@ -443,26 +475,28 @@ struct CurrencyConverterView: View {
             return liveRate
         }
 
+        // Only offer a fallback estimate when the provider is known to be down
+        guard usingFallbackRates else { return nil }
         return fallbackRate(from: fromCurrency, to: currency)
     }
 
-    private func fallbackRate(from: Currency, to: Currency) -> Double {
+    private func fallbackRate(from: Currency, to: Currency) -> Double? {
         if from == to {
             return 1.0
         }
-        
+
         if let fromRates = fallbackExchangeRates[from.rawValue],
            let rate = fromRates[to.rawValue] {
             return rate
         }
-        
+
         if from != .usd && to != .usd,
            let fromToUSD = fallbackExchangeRates[from.rawValue]?["USD"],
            let usdToTarget = fallbackExchangeRates["USD"]?[to.rawValue] {
             return fromToUSD * usdToTarget
         }
-        
-        return 1.0
+
+        return nil
     }
 
     @MainActor
@@ -477,7 +511,7 @@ struct CurrencyConverterView: View {
             lastUpdated = snapshot.fetchedAt
             nextUpdate = snapshot.nextUpdateAt
             usingFallbackRates = false
-            rateStatusMessage = "Live \(fromCurrency.rawValue)-based rates loaded from \(snapshot.providerName)."
+            rateStatusMessage = "Daily reference rates for \(fromCurrency.rawValue) loaded from \(snapshot.providerName) (as of \(snapshot.fetchedAt.formatted(date: .abbreviated, time: .shortened)))."
         } catch {
             usingFallbackRates = true
             rateStatusMessage = error.localizedDescription
@@ -489,6 +523,8 @@ struct CurrencyConverterView: View {
     }
 
     private func saveConversion() {
+        guard exchangeRate > 0 else { return }
+
         let calc = CurrencyConversionCalculation(
             name: "Conversion \(Date().formatted())",
             sourceAmount: amount,
@@ -496,12 +532,13 @@ struct CurrencyConverterView: View {
             targetCurrency: toCurrency,
             exchangeRate: exchangeRate
         )
+        calc.updateTimestamp()
         modelContext.insert(calc)
         do {
             try modelContext.save()
             loadHistory()
         } catch {
-            print("Failed to save conversion: \(error)")
+            mainViewModel.handleError(.dataExportFailed("Could not save the conversion: \(error.localizedDescription)"))
         }
     }
 
@@ -520,7 +557,7 @@ struct CurrencyConverterView: View {
             try modelContext.save()
             conversionHistory.removeAll()
         } catch {
-            print("Failed to clear conversion history: \(error)")
+            mainViewModel.handleError(.dataExportFailed("Could not clear the conversion history: \(error.localizedDescription)"))
         }
     }
 }

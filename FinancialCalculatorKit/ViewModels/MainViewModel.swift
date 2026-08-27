@@ -55,18 +55,15 @@ class MainViewModel {
     init() {
         loadUserPreferences()
     }
-    
+
     /// Load user preferences from storage
     private func loadUserPreferences() {
-        // In a real app, this would load from UserDefaults or SwiftData
-        // For now, using defaults
-        userPreferences = UserPreferences()
+        userPreferences = UserPreferences.load()
     }
-    
+
     /// Save user preferences
     func saveUserPreferences() {
-        // Save to persistent storage
-        // Implementation would go here
+        userPreferences.save()
     }
     
     /// Create a new calculation of the specified type
@@ -187,6 +184,80 @@ class UserPreferences {
     /// Export preferences
     var defaultExportFormat: ExportFormat = .csv
     var includeChartsInExport: Bool = true
+
+    // MARK: - Persistence
+
+    private enum Keys {
+        static let defaultCurrency = "preferences.defaultCurrency"
+        static let defaultPaymentFrequency = "preferences.defaultPaymentFrequency"
+        static let decimalPlaces = "preferences.decimalPlaces"
+        static let useThousandsSeparator = "preferences.useThousandsSeparator"
+        static let defaultChartType = "preferences.defaultChartType"
+        static let showDataLabels = "preferences.showDataLabels"
+        static let sidebarWidth = "preferences.sidebarWidth"
+        static let showTooltips = "preferences.showTooltips"
+        static let autoSaveCalculations = "preferences.autoSaveCalculations"
+        static let defaultExportFormat = "preferences.defaultExportFormat"
+        static let includeChartsInExport = "preferences.includeChartsInExport"
+    }
+
+    /// Load preferences from UserDefaults, falling back to defaults for missing keys.
+    static func load(from defaults: UserDefaults = .standard) -> UserPreferences {
+        let preferences = UserPreferences()
+        if let raw = defaults.string(forKey: Keys.defaultCurrency),
+           let currency = Currency(rawValue: raw) {
+            preferences.defaultCurrency = currency
+        }
+        if let raw = defaults.string(forKey: Keys.defaultPaymentFrequency),
+           let frequency = PaymentFrequency(rawValue: raw) {
+            preferences.defaultPaymentFrequency = frequency
+        }
+        if defaults.object(forKey: Keys.decimalPlaces) != nil {
+            preferences.decimalPlaces = min(max(defaults.integer(forKey: Keys.decimalPlaces), 0), 6)
+        }
+        if defaults.object(forKey: Keys.useThousandsSeparator) != nil {
+            preferences.useThousandsSeparator = defaults.bool(forKey: Keys.useThousandsSeparator)
+        }
+        if let raw = defaults.string(forKey: Keys.defaultChartType),
+           let chartType = ChartType(rawValue: raw) {
+            preferences.defaultChartType = chartType
+        }
+        if defaults.object(forKey: Keys.showDataLabels) != nil {
+            preferences.showDataLabels = defaults.bool(forKey: Keys.showDataLabels)
+        }
+        if defaults.object(forKey: Keys.sidebarWidth) != nil {
+            preferences.sidebarWidth = defaults.double(forKey: Keys.sidebarWidth)
+        }
+        if defaults.object(forKey: Keys.showTooltips) != nil {
+            preferences.showTooltips = defaults.bool(forKey: Keys.showTooltips)
+        }
+        if defaults.object(forKey: Keys.autoSaveCalculations) != nil {
+            preferences.autoSaveCalculations = defaults.bool(forKey: Keys.autoSaveCalculations)
+        }
+        if let raw = defaults.string(forKey: Keys.defaultExportFormat),
+           let format = ExportFormat(rawValue: raw) {
+            preferences.defaultExportFormat = format
+        }
+        if defaults.object(forKey: Keys.includeChartsInExport) != nil {
+            preferences.includeChartsInExport = defaults.bool(forKey: Keys.includeChartsInExport)
+        }
+        return preferences
+    }
+
+    /// Persist preferences to UserDefaults.
+    func save(to defaults: UserDefaults = .standard) {
+        defaults.set(defaultCurrency.rawValue, forKey: Keys.defaultCurrency)
+        defaults.set(defaultPaymentFrequency.rawValue, forKey: Keys.defaultPaymentFrequency)
+        defaults.set(decimalPlaces, forKey: Keys.decimalPlaces)
+        defaults.set(useThousandsSeparator, forKey: Keys.useThousandsSeparator)
+        defaults.set(defaultChartType.rawValue, forKey: Keys.defaultChartType)
+        defaults.set(showDataLabels, forKey: Keys.showDataLabels)
+        defaults.set(sidebarWidth, forKey: Keys.sidebarWidth)
+        defaults.set(showTooltips, forKey: Keys.showTooltips)
+        defaults.set(autoSaveCalculations, forKey: Keys.autoSaveCalculations)
+        defaults.set(defaultExportFormat.rawValue, forKey: Keys.defaultExportFormat)
+        defaults.set(includeChartsInExport, forKey: Keys.includeChartsInExport)
+    }
 }
 
 /// Supported chart types

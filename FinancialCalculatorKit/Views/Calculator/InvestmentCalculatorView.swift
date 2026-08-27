@@ -14,24 +14,20 @@ struct InvestmentCalculatorView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(MainViewModel.self) private var mainViewModel
     
-    @State private var calculation: InvestmentCalculation?
     @State private var calculationName: String = ""
-    @State private var initialInvestment: Double = 100000.0
-    @State private var cashFlows: [Double] = [20000, 25000, 30000, 35000, 40000]
+    @State private var initialInvestment: Double = 0.0
+    @State private var cashFlows: [Double] = []
     @State private var discountRate: Double = 10.0
     @State private var analysisType: InvestmentAnalysisType = .both
     @State private var currency: Currency = .usd
-    
+
     @State private var isCalculating: Bool = false
     @State private var calculationResult: CalculationResult?
     @State private var validationErrors: [String] = []
     @State private var showingSensitivityAnalysis: Bool = false
     @State private var showingCashFlowEditor: Bool = false
     @State private var showingScenarioAnalysis: Bool = false
-    
-    // Cash flow editing
-    @State private var newCashFlow: String = ""
-    @State private var editingCashFlowIndex: Int?
+    @State private var showingSaveConfirmation: Bool = false
     
     var body: some View {
         ScrollView {
@@ -91,13 +87,14 @@ struct InvestmentCalculatorView: View {
             }
         }
         .sheet(isPresented: $showingCashFlowEditor) {
-            CashFlowEditorView(cashFlows: $cashFlows)
+            CashFlowEditorView(cashFlows: $cashFlows, currency: currency)
         }
         .sheet(isPresented: $showingSensitivityAnalysis) {
             if let result = calculationResult {
                 InvestmentSensitivityAnalysisView(
                     baseResult: result,
-                    investmentData: currentInvestmentData
+                    investmentData: currentInvestmentData,
+                    currency: currency
                 )
             }
         }
@@ -105,7 +102,8 @@ struct InvestmentCalculatorView: View {
             if let result = calculationResult {
                 ScenarioAnalysisView(
                     baseResult: result,
-                    investmentData: currentInvestmentData
+                    investmentData: currentInvestmentData,
+                    currency: currency
                 )
             }
         }
@@ -138,7 +136,14 @@ struct InvestmentCalculatorView: View {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundColor(.green)
                     }
-                    
+
+                    if showingSaveConfirmation {
+                        Label("Saved", systemImage: "checkmark.circle.fill")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                            .transition(.opacity)
+                    }
+
                     Text("Investment Decision Tool")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -186,14 +191,12 @@ struct InvestmentCalculatorView: View {
                             Text("Initial Investment")
                                 .font(.headline)
                                 .fontWeight(.medium)
-                            
+
                             Spacer()
-                            
-                            Button(action: {}) {
-                                Image(systemName: "questionmark.circle")
-                            }
-                            .buttonStyle(.plain)
-                            .help("The initial amount invested (entered as positive value)")
+
+                            Image(systemName: "questionmark.circle")
+                                .foregroundColor(.secondary)
+                                .help("The initial amount invested (entered as positive value)")
                         }
                         
                         CurrencyInputField(
@@ -212,14 +215,12 @@ struct InvestmentCalculatorView: View {
                             Text("Discount Rate (Required Return %)")
                                 .font(.headline)
                                 .fontWeight(.medium)
-                            
+
                             Spacer()
-                            
-                            Button(action: {}) {
-                                Image(systemName: "questionmark.circle")
-                            }
-                            .buttonStyle(.plain)
-                            .help("The minimum acceptable rate of return for the investment")
+
+                            Image(systemName: "questionmark.circle")
+                                .foregroundColor(.secondary)
+                                .help("The minimum acceptable rate of return for the investment")
                         }
                         
                         PercentageInputField(
@@ -315,7 +316,9 @@ struct InvestmentCalculatorView: View {
                         )
                         DetailRow(
                             title: "Average Annual Cash Flow",
-                            value: currency.formatValue(cashFlows.reduce(0, +) / Double(cashFlows.count))
+                            value: cashFlows.isEmpty
+                                ? "—"
+                                : currency.formatValue(cashFlows.reduce(0, +) / Double(cashFlows.count))
                         )
                     }
                 }
@@ -495,18 +498,16 @@ struct InvestmentCalculatorView: View {
                             )
                             .foregroundStyle(.blue)
                             .interpolationMethod(.catmullRom)
-                            
-                            // Highlight current discount rate
-                            if abs(point.rate - discountRate) < 0.5 {
-                                PointMark(
-                                    x: .value("Discount Rate", point.rate),
-                                    y: .value("NPV", point.npv)
-                                )
-                                .foregroundStyle(.red)
-                                .symbolSize(100)
-                            }
                         }
-                        
+
+                        // Highlight the exact current discount rate
+                        PointMark(
+                            x: .value("Discount Rate", discountRate),
+                            y: .value("NPV", npvAtCurrentRate)
+                        )
+                        .foregroundStyle(.red)
+                        .symbolSize(100)
+
                         // Add break-even line
                         RuleMark(y: .value("Break-even", 0))
                             .foregroundStyle(.gray)
@@ -573,6 +574,12 @@ struct InvestmentCalculatorView: View {
     private var currentInvestmentData: (initialInvestment: Double, cashFlows: [Double], discountRate: Double) {
         (initialInvestment, cashFlows, discountRate)
     }
+
+    private var npvAtCurrentRate: Double {
+        var allCashFlows = [-abs(initialInvestment)]
+        allCashFlows.append(contentsOf: cashFlows)
+        return CalculationEngine.calculateNPV(cashFlows: allCashFlows, discountRate: discountRate)
+    }
     
     private func performCalculation() {
         guard canCalculate else {
@@ -631,16 +638,16 @@ struct InvestmentCalculatorView: View {
     
     private func resetFields() {
         calculationName = ""
-        initialInvestment = 100000.0
-        cashFlows = [20000, 25000, 30000, 35000, 40000]
+        initialInvestment = 0.0
+        cashFlows = []
         discountRate = 10.0
         analysisType = .both
         clearResults()
     }
-    
+
     private func saveCalculation() {
         guard let result = calculationResult, result.isValid else { return }
-        
+
         let investmentCalculation = InvestmentCalculation(
             name: calculationName,
             initialInvestment: initialInvestment,
@@ -649,29 +656,61 @@ struct InvestmentCalculatorView: View {
             analysisType: analysisType,
             currency: currency
         )
-        
+
+        investmentCalculation.updateTimestamp()
         modelContext.insert(investmentCalculation)
-        
+
         do {
             try modelContext.save()
+            withAnimation {
+                showingSaveConfirmation = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                withAnimation {
+                    showingSaveConfirmation = false
+                }
+            }
         } catch {
-            print("Failed to save calculation: \(error)")
+            mainViewModel.handleError(.dataExportFailed("Failed to save calculation: \(error.localizedDescription)"))
         }
     }
-    
+
     private func exportResults() {
-        // Implementation for exporting results
+        guard let result = calculationResult else { return }
+
+        do {
+            try CalculationExporter.exportResult(
+                suggestedName: calculationName.isEmpty ? "Investment Analysis" : calculationName,
+                primaryLabel: analysisType.displayName,
+                result: result
+            )
+        } catch {
+            mainViewModel.handleError(.dataExportFailed("Failed to export results: \(error.localizedDescription)"))
+        }
     }
-    
+
     private func formatSecondaryValue(key: String, value: Double) -> String {
-        if key.contains("Rate") || key.contains("IRR") || key.contains("%") {
+        switch key {
+        case "NPV at IRR", "Initial Investment", "Total Cash Inflows":
+            return currency.formatValue(value)
+        case "IRR", "MIRR", "Discount Rate":
+            return String(format: "%.3f%%", value)
+        case "Profitability Index":
+            return String(format: "%.3f", value)
+        case "Payback Period":
+            return String(format: "%.1f years", value)
+        default:
+            break
+        }
+
+        if key.contains("NPV") || key.contains("Investment") || key.contains("Inflows") {
+            return currency.formatValue(value)
+        } else if key.contains("Rate") || key.contains("IRR") || key.contains("%") {
             return String(format: "%.3f%%", value)
         } else if key.contains("Index") {
             return String(format: "%.3f", value)
         } else if key.contains("Period") {
             return String(format: "%.1f years", value)
-        } else if key.contains("NPV") || key.contains("Investment") || key.contains("Inflows") {
-            return currency.formatValue(value)
         } else {
             return Formatters.decimalFormatter(decimalPlaces: 2).string(from: NSNumber(value: value)) ?? "0.00"
         }
@@ -704,19 +743,28 @@ struct InvestmentCalculatorView: View {
         }
         
         if analysisType == .irr || analysisType == .both {
-            if result.primaryValue > discountRate + 5 {
-                insights.append("IRR significantly exceeds required return - strong investment opportunity")
-            } else if result.primaryValue > discountRate {
-                insights.append("IRR exceeds required return - meets investment criteria")
+            // For .both the primary value is NPV, so read the IRR from the secondary values
+            let irrValue: Double? = analysisType == .irr
+                ? (result.primaryValue.isFinite ? result.primaryValue : nil)
+                : result.secondaryValues["IRR"]
+
+            if let irr = irrValue {
+                if irr > discountRate + 5 {
+                    insights.append("IRR significantly exceeds required return - strong investment opportunity")
+                } else if irr > discountRate {
+                    insights.append("IRR exceeds required return - meets investment criteria")
+                }
             }
         }
-        
+
         let totalCashInflows = cashFlows.reduce(0, +)
-        let simplePayback = initialInvestment / (totalCashInflows / Double(cashFlows.count))
-        if simplePayback > Double(cashFlows.count) {
-            insights.append("Cash flows may not fully recover initial investment over project life")
+        if !cashFlows.isEmpty, totalCashInflows > 0 {
+            let simplePayback = initialInvestment / (totalCashInflows / Double(cashFlows.count))
+            if simplePayback > Double(cashFlows.count) {
+                insights.append("Cash flows may not fully recover initial investment over project life")
+            }
         }
-        
+
         return insights
     }
     
@@ -741,6 +789,7 @@ struct InvestmentCalculatorView: View {
 
 struct CashFlowEditorView: View {
     @Binding var cashFlows: [Double]
+    let currency: Currency
     @Environment(\.dismiss) private var dismiss
     @State private var newCashFlow: String = ""
     @State private var editingIndex: Int?
@@ -795,7 +844,7 @@ struct CashFlowEditorView: View {
                                         .buttonStyle(.bordered)
                                         .controlSize(.small)
                                     } else {
-                                        Text("$\(cashFlow, specifier: "%.2f")")
+                                        Text(currency.formatValue(cashFlow))
                                             .font(.system(.body, design: .monospaced))
                                             .foregroundColor(cashFlow >= 0 ? .green : .red)
                                         
@@ -841,6 +890,7 @@ struct CashFlowEditorView: View {
 struct InvestmentSensitivityAnalysisView: View {
     let baseResult: CalculationResult
     let investmentData: (initialInvestment: Double, cashFlows: [Double], discountRate: Double)
+    let currency: Currency
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -886,23 +936,22 @@ struct InvestmentSensitivityAnalysisView: View {
                                 AxisTick()
                                 AxisValueLabel {
                                     if let npv = value.as(Double.self) {
-                                        Text("$\(Int(npv / 1000))K")
+                                        Text(currency.symbol + Formatters.formatAbbreviated(npv))
                                     }
                                 }
                             }
                         }
                         .padding()
                     }
-                    
+
                     // Key metrics
                     GroupBox("Sensitivity Metrics") {
                         VStack(alignment: .leading, spacing: 12) {
-                            DetailRow(title: "Break-even Discount Rate", value: String(format: "%.2f%%", calculateBreakevenRate()))
-                            DetailRow(title: "NPV at Current Rate", value: Currency.usd.formatValue(baseResult.primaryValue))
-                            DetailRow(title: "Sensitivity Score", value: "High")
-                            
+                            DetailRow(title: "Break-even Discount Rate", value: breakevenRateText)
+                            DetailRow(title: "NPV at Current Rate", value: currency.formatValue(baseResult.primaryValue))
+
                             Divider()
-                            
+
                             Text("A higher break-even rate indicates a more robust investment that can withstand higher discount rates.")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -940,16 +989,18 @@ struct InvestmentSensitivityAnalysisView: View {
         return data
     }
     
-    private func calculateBreakevenRate() -> Double {
+    private var breakevenRateText: String {
         var allCashFlows = [-abs(investmentData.initialInvestment)]
         allCashFlows.append(contentsOf: investmentData.cashFlows)
-        return CalculationEngine.calculateIRR(cashFlows: allCashFlows)
+        let rate = CalculationEngine.calculateIRR(cashFlows: allCashFlows)
+        return rate.isFinite ? String(format: "%.2f%%", rate) : "Not available"
     }
 }
 
 struct ScenarioAnalysisView: View {
     let baseResult: CalculationResult
     let investmentData: (initialInvestment: Double, cashFlows: [Double], discountRate: Double)
+    let currency: Currency
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -1018,14 +1069,14 @@ struct ScenarioAnalysisView: View {
     
     @ViewBuilder
     private func npvColumn(for scenario: InvestmentScenario) -> some View {
-        Text(Currency.usd.formatValue(scenario.npv))
+        Text(currency.formatValue(scenario.npv))
             .font(.system(.body, design: .monospaced))
             .foregroundColor(scenario.npv >= 0 ? .green : .red)
     }
-    
+
     @ViewBuilder
     private func irrColumn(for scenario: InvestmentScenario) -> some View {
-        Text("\(scenario.irr, specifier: "%.2f")%")
+        Text(scenario.irr.isFinite ? String(format: "%.2f%%", scenario.irr) : "—")
             .font(.system(.body, design: .monospaced))
     }
     

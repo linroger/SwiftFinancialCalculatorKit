@@ -40,15 +40,13 @@ struct Formatters {
         return formatter
     }()
     
-    /// Decimal formatter with thousands separator
+    /// Decimal formatter with thousands separator (locale-aware separators)
     static func decimalFormatter(decimalPlaces: Int = 2, useGroupingSeparator: Bool = true) -> NumberFormatter {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         formatter.minimumFractionDigits = decimalPlaces
         formatter.maximumFractionDigits = decimalPlaces
         formatter.usesGroupingSeparator = useGroupingSeparator
-        formatter.groupingSeparator = ","
-        formatter.decimalSeparator = "."
         return formatter
     }
     
@@ -61,14 +59,13 @@ struct Formatters {
         return formatter
     }()
     
-    /// Integer formatter with thousands separator
+    /// Integer formatter with thousands separator (locale-aware)
     static let integerFormatter: NumberFormatter = {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         formatter.minimumFractionDigits = 0
         formatter.maximumFractionDigits = 0
         formatter.usesGroupingSeparator = true
-        formatter.groupingSeparator = ","
         return formatter
     }()
     
@@ -105,10 +102,11 @@ struct Formatters {
         return formatter
     }()
     
-    /// ISO date formatter
+    /// ISO date formatter (fixed POSIX locale so era/calendar settings can't leak in)
     static let isoDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone(abbreviation: "UTC")
         return formatter
     }()
@@ -126,11 +124,12 @@ struct Formatters {
     /// Format a number as currency with proper handling of negative values
     static func formatCurrency(_ value: Double, currency: Currency, showSign: Bool = false) -> String {
         let formatter = currencyFormatter(for: currency)
-        
+
         if showSign && value > 0 {
-            formatter.positivePrefix = "+"
+            // Keep the currency symbol; positivePrefix replaces the whole prefix
+            formatter.positivePrefix = "+" + (formatter.currencySymbol ?? "")
         }
-        
+
         return formatter.string(from: NSNumber(value: value)) ?? currency.formatValue(value)
     }
     
@@ -141,10 +140,11 @@ struct Formatters {
     
     /// Format time duration in years and months
     static func formatDuration(years: Double) -> String {
-        let totalMonths = Int(years * 12)
+        guard years.isFinite, years > 0 else { return "0 months" }
+        let totalMonths = Int((years * 12).rounded())
         let displayYears = totalMonths / 12
         let displayMonths = totalMonths % 12
-        
+
         if displayYears > 0 && displayMonths > 0 {
             return "\(displayYears) year\(displayYears == 1 ? "" : "s") \(displayMonths) month\(displayMonths == 1 ? "" : "s")"
         } else if displayYears > 0 {

@@ -61,6 +61,7 @@ struct FinancialChartView: View {
             chartMarks(for: dataPoint)
         }
         .frame(height: height)
+        .chartLegend(showLegend ? .visible : .hidden)
         .chartXAxis { xAxisMarks }
         .chartYAxis { yAxisMarks }
         .chartPlotStyle { plotArea in
@@ -82,21 +83,22 @@ struct FinancialChartView: View {
                 y: .value("Value", dataPoint.y)
             )
             .foregroundStyle(dataPoint.y >= 0 ? Color.green : Color.red)
-            .interpolationMethod(.catmullRom)
-            
-            if let hoveredX = hoveredX, abs(dataPoint.x - hoveredX) < 0.5 {
+            .interpolationMethod(.monotone)
+
+            // Highlight exactly the hovered point, not everything within a fixed distance
+            if selectedDataPoint?.id == dataPoint.id {
                 PointMark(
                     x: .value("Period", dataPoint.x),
                     y: .value("Value", dataPoint.y)
                 )
                 .foregroundStyle(dataPoint.y >= 0 ? Color.green : Color.red)
                 .symbolSize(100)
-                
+
                 RuleMark(x: .value("Period", dataPoint.x))
                     .foregroundStyle(Color.gray.opacity(0.3))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
             }
-            
+
         case .bar:
             BarMark(
                 x: .value("Period", dataPoint.x),
@@ -104,21 +106,21 @@ struct FinancialChartView: View {
             )
             .foregroundStyle(dataPoint.y >= 0 ? Color.green.gradient : Color.red.gradient)
             .cornerRadius(4)
-            
+
         case .area:
             AreaMark(
                 x: .value("Period", dataPoint.x),
                 y: .value("Value", dataPoint.y)
             )
             .foregroundStyle(areaGradient(for: dataPoint.y))
-            .interpolationMethod(.catmullRom)
-            
+            .interpolationMethod(.monotone)
+
             LineMark(
                 x: .value("Period", dataPoint.x),
                 y: .value("Value", dataPoint.y)
             )
             .foregroundStyle(dataPoint.y >= 0 ? Color.green : Color.red)
-            .interpolationMethod(.catmullRom)
+            .interpolationMethod(.monotone)
             .lineStyle(StrokeStyle(lineWidth: 2))
         }
     }
@@ -273,7 +275,7 @@ struct CashFlowTimelineChart: View {
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             } else {
-                                Text("Period \(Int(flow.x))")
+                                Text("Period \(Int(flow.x.isFinite ? flow.x : 0))")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
@@ -316,6 +318,12 @@ struct BreakdownPieChart: View {
     var total: Double {
         segments.reduce(0) { $0 + $1.value }
     }
+
+    /// Percentage of the total for one segment, safe against a zero/NaN total.
+    private func percentageText(for value: Double) -> String {
+        guard total != 0, (value / total).isFinite else { return "—" }
+        return "\(Int((value / total) * 100))%"
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -345,7 +353,7 @@ struct BreakdownPieChart: View {
                             Text(currency.formatValue(segment.value))
                                 .font(.headline)
                                 .fontWeight(.bold)
-                            Text("\(Int((segment.value / total) * 100))%")
+                            Text(percentageText(for: segment.value))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -388,7 +396,7 @@ struct BreakdownPieChart: View {
                                             .font(.caption)
                                             .fontWeight(.medium)
                                         
-                                        Text("(\(Int((segment.value / total) * 100))%)")
+                                        Text("(\(percentageText(for: segment.value)))")
                                             .font(.caption)
                                             .foregroundColor(.secondary)
                                     }

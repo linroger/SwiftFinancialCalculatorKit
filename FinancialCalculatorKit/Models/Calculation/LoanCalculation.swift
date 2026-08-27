@@ -152,10 +152,13 @@ final class LoanCalculation {
         
         if extraPayment > 0 {
             secondaryValues["Extra Payment"] = extraPayment
-            // Calculate time saved with extra payments
-            let timeWithoutExtra = calculatePayoffTime(extraPayment: 0)
-            let timeWithExtra = calculatePayoffTime(extraPayment: extraPayment)
+            // Compare against the schedule without extra payments
+            let baseSchedule = calculateAmortization(extraPayment: 0)
+            let baseInterest = baseSchedule.reduce(0) { $0 + $1.interestPayment }
+            let timeWithoutExtra = paymentFrequency.yearsFromPeriods(Double(baseSchedule.count))
+            let timeWithExtra = paymentFrequency.yearsFromPeriods(Double(amortization.count))
             secondaryValues["Time Saved (Years)"] = timeWithoutExtra - timeWithExtra
+            secondaryValues["Interest Saved"] = baseInterest - totalInterest
         }
         
         let explanation = loanType == .mortgage ? 
@@ -223,44 +226,59 @@ final class LoanCalculation {
         return errors
     }
     
-    /// Calculate monthly payment amount
+    /// Periodic interest rate as a decimal (e.g. 6% annual, monthly → 0.005)
+    private var periodicRateDecimal: Double {
+        paymentFrequency.periodRate(from: annualInterestRate) / 100
+    }
+
+    /// Calculate the payment per period including any extra payment
     func calculateMonthlyPayment() -> Double {
         let loanAmount = principalAmount - downPayment
-        let periodRate = paymentFrequency.periodRate(from: annualInterestRate)
+        let periodRatePercent = paymentFrequency.periodRate(from: annualInterestRate)
         let numberOfPayments = paymentFrequency.numberOfPeriods(from: loanTermYears)
-        
+
         let basePayment = CalculationEngine.calculateLoanPayment(
             principal: loanAmount,
-            interestRate: periodRate * 100,
+            interestRate: periodRatePercent,
             numberOfPayments: numberOfPayments
         )
-        
+
         return basePayment + extraPayment
     }
-    
-    /// Calculate complete amortization schedule
+
+    /// Calculate the complete amortization schedule using the model's extra payment
     func calculateAmortization() -> [AmortizationEntry] {
+        calculateAmortization(extraPayment: extraPayment)
+    }
+
+    /// Calculate an amortization schedule for an arbitrary extra payment.
+    /// Pure with respect to the model — nothing is mutated.
+    func calculateAmortization(extraPayment: Double) -> [AmortizationEntry] {
         let loanAmount = principalAmount - downPayment
-        let monthlyRate = paymentFrequency.periodRate(from: annualInterestRate / 100)
-        let basePayment = calculateMonthlyPayment() - extraPayment
+        let periodRate = periodicRateDecimal
+        let basePayment = calculateMonthlyPayment() - self.extraPayment
         let totalPayment = basePayment + extraPayment
-        
+        let maxPayments = Int(paymentFrequency.numberOfPeriods(from: loanTermYears).rounded())
+
         var schedule: [AmortizationEntry] = []
         var remainingBalance = loanAmount
         var paymentNumber = 1
-        
-        while remainingBalance > 0.01 && paymentNumber <= Int(paymentFrequency.numberOfPeriods(from: loanTermYears)) {
-            let interestPayment = remainingBalance * monthlyRate
+
+        while remainingBalance > 0.01 && paymentNumber <= maxPayments {
+            let interestPayment = remainingBalance * periodRate
             var principalPayment = totalPayment - interestPayment
-            
+
+            // A payment that cannot cover interest would never amortize
+            guard principalPayment > 0 else { break }
+
             // Ensure we don't overpay
             if principalPayment > remainingBalance {
                 principalPayment = remainingBalance
             }
-            
+
             let actualPayment = interestPayment + principalPayment
             remainingBalance -= principalPayment
-            
+
             let entry = AmortizationEntry(
                 paymentNumber: paymentNumber,
                 payment: actualPayment,
@@ -268,28 +286,16 @@ final class LoanCalculation {
                 interestPayment: interestPayment,
                 remainingBalance: remainingBalance
             )
-            
+
             schedule.append(entry)
             paymentNumber += 1
-            
+
             if remainingBalance < 0.01 {
                 break
             }
         }
-        
+
         return schedule
-    }
-    
-    /// Calculate payoff time with given extra payment
-    private func calculatePayoffTime(extraPayment: Double) -> Double {
-        let originalExtra = self.extraPayment
-        self.extraPayment = extraPayment
-        
-        let amortization = calculateAmortization()
-        let payoffTime = paymentFrequency.yearsFromPeriods(Double(amortization.count))
-        
-        self.extraPayment = originalExtra
-        return payoffTime
     }
     
     /// Generate chart data for payment breakdown visualization

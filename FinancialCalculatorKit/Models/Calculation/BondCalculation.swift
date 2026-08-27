@@ -179,6 +179,16 @@ final class BondCalculation {
             secondaryValues["Current Yield"] = currentYield
         }
         
+        guard calculatedValue.isFinite else {
+            return CalculationResult(
+                primaryValue: 0.0,
+                formattedPrimaryValue: "No solution",
+                explanation: solveFor == .yield
+                    ? "No yield between -50% and 1000% reproduces this price. Check the price and maturity inputs."
+                    : "The bond price could not be computed from these inputs."
+            )
+        }
+
         secondaryValues["Years to Maturity"] = yearsToMaturity
         secondaryValues["Total Payments"] = yearsToMaturity * paymentsPerYear
 
@@ -254,7 +264,8 @@ final class BondCalculation {
         var data: [ChartDataPoint] = []
         let couponPayment = faceValue * couponRate / 100 / paymentsPerYear
         let totalPeriods = Int(yearsToMaturity * paymentsPerYear)
-        
+        guard totalPeriods >= 1 else { return [] }
+
         for period in 1...totalPeriods {
             let year = Double(period) / paymentsPerYear
             var cashFlow = couponPayment

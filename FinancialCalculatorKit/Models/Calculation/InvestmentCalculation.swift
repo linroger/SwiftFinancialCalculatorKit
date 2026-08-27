@@ -142,68 +142,104 @@ final class InvestmentCalculation {
             
         case .irr:
             calculatedValue = CalculationEngine.calculateIRR(cashFlows: allCashFlows)
-            
+
+            guard calculatedValue.isFinite else {
+                return CalculationResult(
+                    primaryValue: 0.0,
+                    formattedPrimaryValue: "No IRR found",
+                    explanation: "These cash flows have no internal rate of return between -99% and 1000%. The series needs both outflows and inflows."
+                )
+            }
+
             explanation = "The internal rate of return is the discount rate that makes NPV equal to zero"
-            
+
             secondaryValues["Initial Investment"] = initialInvestment
             secondaryValues["Total Cash Inflows"] = cashFlows.reduce(0, +)
-            
+
             // Calculate NPV at this IRR (should be close to 0)
             let npvAtIRR = CalculationEngine.calculateNPV(
                 cashFlows: allCashFlows,
                 discountRate: calculatedValue
             )
             secondaryValues["NPV at IRR"] = npvAtIRR
-            
-            // Calculate payback period
-            var cumulativeCashFlow = -abs(initialInvestment)
-            var paybackPeriod = 0.0
-            for (index, cashFlow) in cashFlows.enumerated() {
-                cumulativeCashFlow += cashFlow
-                if cumulativeCashFlow >= 0 {
-                    paybackPeriod = Double(index) + 1 - (cumulativeCashFlow - cashFlow) / cashFlow
-                    break
-                }
+
+            let mirr = CalculationEngine.calculateMIRR(
+                cashFlows: allCashFlows,
+                financeRate: discountRate,
+                reinvestmentRate: discountRate
+            )
+            if mirr.isFinite {
+                secondaryValues["MIRR"] = mirr
             }
-            if paybackPeriod > 0 {
+
+            if let paybackPeriod = calculatePaybackPeriod() {
                 secondaryValues["Payback Period"] = paybackPeriod
             }
-            
+
         case .both:
             let npv = CalculationEngine.calculateNPV(
                 cashFlows: allCashFlows,
                 discountRate: discountRate
             )
             let irr = CalculationEngine.calculateIRR(cashFlows: allCashFlows)
-            
+            let mirr = CalculationEngine.calculateMIRR(
+                cashFlows: allCashFlows,
+                financeRate: discountRate,
+                reinvestmentRate: discountRate
+            )
+
             calculatedValue = npv // Primary value is NPV
-            secondaryValues["IRR"] = irr
+            if irr.isFinite {
+                secondaryValues["IRR"] = irr
+            }
+            if mirr.isFinite {
+                secondaryValues["MIRR"] = mirr
+            }
             secondaryValues["Initial Investment"] = initialInvestment
             secondaryValues["Total Cash Inflows"] = cashFlows.reduce(0, +)
             secondaryValues["Discount Rate"] = discountRate
-            
-            explanation = npv > 0 ? 
-                "The investment is profitable with an IRR of \(String(format: "%.2f%%", irr))" :
-                "The investment would result in a loss at the given discount rate"
+
+            if npv > 0 {
+                explanation = irr.isFinite
+                    ? "The investment is profitable with an IRR of \(String(format: "%.2f%%", irr))"
+                    : "The investment is profitable at the given discount rate"
+            } else {
+                explanation = "The investment would result in a loss at the given discount rate"
+            }
         }
-        
+
         // Generate chart data
         let chartData = generateCashFlowData()
-        
+
         return CalculationResult(
             primaryValue: calculatedValue,
             secondaryValues: secondaryValues,
-            formattedPrimaryValue: analysisType == .irr ? 
-                String(format: "%.3f%%", calculatedValue) : 
+            formattedPrimaryValue: analysisType == .irr ?
+                String(format: "%.3f%%", calculatedValue) :
                 currency.formatValue(calculatedValue),
             explanation: explanation,
             chartData: chartData
         )
     }
     
+    /// Payback period in periods: full periods before recovery plus the fraction
+    /// of the recovery period needed. `nil` when the investment is never recovered.
+    private func calculatePaybackPeriod() -> Double? {
+        var cumulativeCashFlow = -abs(initialInvestment)
+        for (index, cashFlow) in cashFlows.enumerated() {
+            let before = cumulativeCashFlow
+            cumulativeCashFlow += cashFlow
+            if cumulativeCashFlow >= 0 {
+                guard cashFlow > 0 else { return Double(index) }
+                return Double(index) + (-before / cashFlow)
+            }
+        }
+        return nil
+    }
+
     var isValid: Bool {
         guard !name.isEmpty else { return false }
-        
+
         return initialInvestment != 0 &&
                !cashFlows.isEmpty &&
                discountRate >= 0

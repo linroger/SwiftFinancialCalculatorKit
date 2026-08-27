@@ -58,12 +58,6 @@ struct ResultDisplayView: View {
                 .foregroundColor(.primary)
                 .minimumScaleFactor(0.5)
                 .lineLimit(1)
-            
-            if result.primaryValue != 0 {
-                Text(formatSecondaryResult())
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
@@ -159,17 +153,6 @@ struct ResultDisplayView: View {
         )
     }
     
-    private func formatSecondaryResult() -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        formatter.maximumFractionDigits = 2
-        formatter.minimumFractionDigits = 2
-        
-        if let formattedNumber = formatter.string(from: NSNumber(value: result.primaryValue)) {
-            return "\(currency.symbol)\(formattedNumber)"
-        }
-        return currency.formatValue(result.primaryValue)
-    }
 }
 
 /// Row component for secondary values

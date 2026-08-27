@@ -89,9 +89,20 @@ actor ExchangeRateService {
             return cached
         }
 
-        let url = URL(string: "https://open.er-api.com/v6/latest/\(base.rawValue)")!
-        let (data, _) = try await session.data(from: url)
-        let response = try JSONDecoder().decode(LatestRatesResponse.self, from: data)
+        guard let url = URL(string: "https://open.er-api.com/v6/latest/\(base.rawValue)") else {
+            throw ExchangeRateServiceError.invalidBaseCurrency
+        }
+        let (data, urlResponse) = try await session.data(from: url)
+
+        if let httpResponse = urlResponse as? HTTPURLResponse,
+           !(200...299).contains(httpResponse.statusCode) {
+            throw ExchangeRateServiceError.invalidResponse
+        }
+
+        guard let response = try? JSONDecoder().decode(LatestRatesResponse.self, from: data),
+              response.result == "success" else {
+            throw ExchangeRateServiceError.invalidResponse
+        }
 
         guard let resolvedBase = Currency(rawValue: response.baseCode) else {
             throw ExchangeRateServiceError.invalidBaseCurrency

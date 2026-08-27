@@ -76,6 +76,26 @@ struct TimeValueCalculatorView: View {
         .onAppear {
             loadUserPreferences()
         }
+        .onChange(of: presentValue) { clearResults() }
+        .onChange(of: futureValue) { clearResults() }
+        .onChange(of: payment) { clearResults() }
+        .onChange(of: interestRate) { clearResults() }
+        .onChange(of: numberOfYears) { clearResults() }
+        .onChange(of: paymentFrequency) { clearResults() }
+        .onChange(of: paymentsAtBeginning) { clearResults() }
+        .onChange(of: currency) { clearResults() }
+        .onChange(of: solveFor) { _, newValue in
+            // Clear the field now being solved for so a stale value cannot
+            // silently feed the calculation.
+            switch newValue {
+            case .presentValue: presentValue = nil
+            case .futureValue: futureValue = nil
+            case .payment: payment = nil
+            case .interestRate: interestRate = nil
+            case .numberOfYears: numberOfYears = nil
+            }
+            clearResults()
+        }
     }
 
     @ViewBuilder
@@ -285,6 +305,26 @@ struct TimeValueCalculatorView: View {
             Text("Once you calculate, this workspace will show the solved value, growth trajectory, scenario ladder, and milestone timing.")
                 .foregroundColor(.secondary)
 
+            if !missingRequirements.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Still needed to calculate:")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+
+                    ForEach(missingRequirements, id: \.self) { requirement in
+                        HStack(alignment: .top, spacing: 6) {
+                            Image(systemName: "circle.dashed")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            Text(requirement)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
+
             HStack(spacing: 16) {
                 TVMPreviewCard(
                     title: "Trajectory",
@@ -315,9 +355,60 @@ struct TimeValueCalculatorView: View {
         )
     }
 
+    /// Inputs still needed before the selected solve can run.
+    /// Mirrors TimeValueCalculation.validationErrors so the button state and the
+    /// model's validation always agree.
+    private var missingRequirements: [String] {
+        var missing: [String] = []
+
+        if calculationName.isEmpty {
+            missing.append("Name is required")
+        }
+
+        let hasMoneyInput = (presentValue ?? 0) != 0 || (payment ?? 0) != 0
+
+        switch solveFor {
+        case .presentValue:
+            if interestRate == nil { missing.append("Interest rate is required") }
+            if numberOfYears == nil { missing.append("Number of years is required") }
+            if (futureValue ?? 0) == 0 && (payment ?? 0) == 0 {
+                missing.append("Provide a future value or a payment amount")
+            }
+        case .futureValue:
+            if interestRate == nil { missing.append("Interest rate is required") }
+            if numberOfYears == nil { missing.append("Number of years is required") }
+            if !hasMoneyInput {
+                missing.append("Provide a present value or a payment amount")
+            }
+        case .payment:
+            if interestRate == nil { missing.append("Interest rate is required") }
+            if numberOfYears == nil { missing.append("Number of years is required") }
+            if (presentValue ?? 0) == 0 && (futureValue ?? 0) == 0 {
+                missing.append("Provide a present value or a future value")
+            }
+        case .interestRate:
+            if numberOfYears == nil { missing.append("Number of years is required") }
+            if (futureValue ?? 0) == 0 {
+                missing.append("A future value target is required to solve for the rate")
+            }
+            if !hasMoneyInput {
+                missing.append("Provide a present value or a payment amount")
+            }
+        case .numberOfYears:
+            if interestRate == nil { missing.append("Interest rate is required") }
+            if (futureValue ?? 0) == 0 {
+                missing.append("A future value target is required to solve for the time")
+            }
+            if !hasMoneyInput {
+                missing.append("Provide a present value or a payment amount")
+            }
+        }
+
+        return missing
+    }
+
     private var canCalculate: Bool {
-        let filledValues = [presentValue, futureValue, payment, interestRate, numberOfYears].compactMap { $0 }.count
-        return filledValues >= 4 && !calculationName.isEmpty
+        missingRequirements.isEmpty
     }
 
     private func performCalculation() {
@@ -358,6 +449,7 @@ struct TimeValueCalculatorView: View {
     private func saveCalculation() {
         guard let calc = calculation else { return }
 
+        calc.updateTimestamp()
         modelContext.insert(calc)
 
         do {
@@ -365,6 +457,12 @@ struct TimeValueCalculatorView: View {
         } catch {
             mainViewModel.handleError(.dataExportFailed("Failed to save calculation: \(error.localizedDescription)"))
         }
+    }
+
+    private func clearResults() {
+        calculationResult = nil
+        calculation = nil
+        validationErrors = []
     }
 
     private func clearAll() {
@@ -536,7 +634,7 @@ struct FormulaReferenceView: View {
     private var formulaDescription: String {
         switch solveFor {
         case .presentValue:
-            return "Discount future cash flows and recurring payments back to today."
+            return "Solve the amount needed today, net of planned payments, to reach the target."
         case .futureValue:
             return "Project the end balance from current capital and recurring payments."
         case .payment:
@@ -551,15 +649,15 @@ struct FormulaReferenceView: View {
     private var formulaText: String {
         switch solveFor {
         case .presentValue:
-            return "$$PV = \\frac{FV}{(1 + r)^n} + PMT \\times \\frac{1 - (1 + r)^{-n}}{r}$$"
+            return "$$PV = \\frac{FV}{(1 + r)^n} - PMT \\times \\frac{1 - (1 + r)^{-n}}{r}$$"
         case .futureValue:
             return "$$FV = PV \\times (1 + r)^n + PMT \\times \\frac{(1 + r)^n - 1}{r}$$"
         case .payment:
-            return "$$PMT = \\frac{PV \\times r}{1 - (1 + r)^{-n}}$$"
+            return "$$PMT = \\frac{(FV - PV(1 + r)^n) \\times r}{(1 + r)^n - 1}$$"
         case .interestRate:
-            return "$$r = \\text{Solved numerically using Newton-Raphson}$$"
+            return "$$r = \\text{Solved numerically using bisection}$$"
         case .numberOfYears:
-            return "$$n = \\frac{\\ln(FV/PV)}{\\ln(1 + r)}$$"
+            return "$$n = \\frac{\\ln\\left((FV + PMT/r)/(PV + PMT/r)\\right)}{\\ln(1 + r)}$$"
         }
     }
 

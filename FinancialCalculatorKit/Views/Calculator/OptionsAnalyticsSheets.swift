@@ -36,10 +36,8 @@ struct GreeksAnalysisView: View {
     private struct GreekCurvePoint: Identifiable {
         let id = UUID()
         let spot: Double
-        let delta: Double
-        let gamma: Double
-        let theta: Double
-        let vega: Double
+        let greek: String
+        let value: Double
     }
 
     private var greekCards: [(String, String, Double, String)] {
@@ -59,7 +57,7 @@ struct GreeksAnalysisView: View {
         let steps = 18
         let increment = (end - start) / Double(steps)
 
-        return (0...steps).map { index in
+        return (0...steps).flatMap { index -> [GreekCurvePoint] in
             let spot = start + Double(index) * increment
             let greeks = CalculationEngine.calculateOptionGreeks(
                 spotPrice: spot,
@@ -70,13 +68,10 @@ struct GreeksAnalysisView: View {
                 optionType: optionData.optionType
             )
 
-            return GreekCurvePoint(
-                spot: spot,
-                delta: greeks.delta,
-                gamma: greeks.gamma,
-                theta: greeks.theta,
-                vega: greeks.vega
-            )
+            return [
+                GreekCurvePoint(spot: spot, greek: "Delta", value: greeks.delta),
+                GreekCurvePoint(spot: spot, greek: "Gamma ×10", value: greeks.gamma * 10)
+            ]
         }
     }
 
@@ -99,23 +94,19 @@ struct GreeksAnalysisView: View {
 
     private var sensitivityChartSection: some View {
         GroupBox("Sensitivity Across Spot Prices") {
-            Chart {
-                ForEach(greekCurve) { point in
-                    LineMark(
-                        x: .value("Spot", point.spot),
-                        y: .value("Delta", point.delta)
-                    )
-                    .foregroundStyle(.blue)
-
-                    LineMark(
-                        x: .value("Spot", point.spot),
-                        y: .value("Gamma", point.gamma * 10)
-                    )
-                    .foregroundStyle(.orange)
-                }
+            Chart(greekCurve) { point in
+                LineMark(
+                    x: .value("Spot", point.spot),
+                    y: .value("Value", point.value)
+                )
+                .foregroundStyle(by: .value("Greek", point.greek))
             }
+            .chartForegroundStyleScale([
+                "Delta": Color.blue,
+                "Gamma ×10": Color.orange
+            ])
             .frame(height: 240)
-            .chartYAxisLabel("Delta / Gamma×10")
+            .chartYAxisLabel("Delta / Gamma ×10")
             .padding(.top, 8)
         }
     }
@@ -197,18 +188,27 @@ struct VolatilitySurfaceView: View {
     }
 
     private var readoutPoints: [SurfacePoint] {
-        surfacePoints
+        var filtered = surfacePoints
             .filter { abs($0.strike - optionData.strikePrice) < optionData.spotPrice * 0.12 }
-            .sorted { lhs, rhs in
-                if lhs.expiryMonths == rhs.expiryMonths {
-                    return lhs.strike < rhs.strike
-                }
-                return lhs.expiryMonths < rhs.expiryMonths
+
+        // When the entered strike is far from every grid strike, fall back to the
+        // nearest strike column so the readout is never empty.
+        if filtered.isEmpty, let nearest = surfacePoints.min(by: {
+            abs($0.strike - optionData.strikePrice) < abs($1.strike - optionData.strikePrice)
+        }) {
+            filtered = surfacePoints.filter { $0.strike == nearest.strike }
+        }
+
+        return filtered.sorted { lhs, rhs in
+            if lhs.expiryMonths == rhs.expiryMonths {
+                return lhs.strike < rhs.strike
             }
+            return lhs.expiryMonths < rhs.expiryMonths
+        }
     }
 
     private var surfaceChartSection: some View {
-        GroupBox("Scenario Volatility Surface") {
+        GroupBox("Hypothetical Skew Scenario") {
             Chart(surfacePoints) { point in
                 RectangleMark(
                     x: .value("Strike", point.strike),
@@ -240,7 +240,7 @@ struct VolatilitySurfaceView: View {
     }
 
     private var narrativeSection: some View {
-        Text("This surface is no longer a placeholder. It maps how premium and required volatility change across strikes and expiries using the current contract as the anchor scenario.")
+        Text("Volatility values are modeled from the volatility you entered, using an illustrative skew and term adjustment — they are not market-implied quotes. Use this scenario to explore how premium responds across strikes and expiries.")
             .font(.body)
             .foregroundColor(.secondary)
     }

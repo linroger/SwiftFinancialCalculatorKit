@@ -69,13 +69,10 @@ struct InputFieldView: View {
                 Spacer()
                 
                 if let helpText = helpText {
-                    Button(action: {}) {
-                        Image(systemName: "questionmark.circle")
-                            .font(.callout)
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .help(helpText)
+                    Image(systemName: "questionmark.circle")
+                        .font(.callout)
+                        .foregroundColor(.secondary)
+                        .help(helpText)
                 }
             }
             
@@ -172,6 +169,61 @@ enum KeyboardType {
     case `default`
     case decimalPad
     case numberPad
+}
+
+/// Parse user-typed numbers accepting both the current locale's separators and
+/// plain "1234.5" input, so "1.234,56" (de) and "1,234.56" (en) both work.
+func parseUserNumber(_ string: String) -> Double? {
+    let trimmed = string.trimmingCharacters(in: .whitespaces)
+    guard !trimmed.isEmpty else { return nil }
+
+    let formatter = NumberFormatter()
+    formatter.numberStyle = .decimal
+    if let number = formatter.number(from: trimmed) {
+        return number.doubleValue
+    }
+    return Double(trimmed)
+}
+
+/// Shared label header used by the specialized input fields.
+private struct InputFieldHeader: View {
+    let title: String
+    let subtitle: String?
+    let isRequired: Bool
+    let helpText: String?
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Text(title)
+                        .font(.headline)
+                        .fontWeight(.medium)
+
+                    if isRequired {
+                        Text("*")
+                            .foregroundColor(.red)
+                            .font(.headline)
+                    }
+                }
+
+                if let subtitle = subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            Spacer()
+
+            if let helpText = helpText {
+                Image(systemName: "questionmark.circle")
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+                    .help(helpText)
+            }
+        }
+    }
 }
 
 /// Input validation result
@@ -290,25 +342,42 @@ struct CurrencyInputField: View {
     }
     
     var body: some View {
-        TextField(title, text: $stringValue, onEditingChanged: { editing in
-            isEditing = editing
-            if !editing {
-                // Format the display when editing ends
-                if let val = value {
-                    stringValue = String(format: "%.2f", val)
-                }
+        VStack(alignment: .leading, spacing: 6) {
+            if !title.isEmpty {
+                InputFieldHeader(
+                    title: title,
+                    subtitle: subtitle,
+                    isRequired: isRequired,
+                    helpText: helpText
+                )
             }
-        })
-        .textFieldStyle(FinancialTextFieldStyle(
-            isEditing: isEditing,
-            hasError: false,
-            isFocused: isEditing
-        ))
+
+            HStack(spacing: 8) {
+                Text(currency.symbol)
+                    .font(.system(.body, design: .monospaced))
+                    .foregroundColor(.secondary)
+
+                TextField(title.isEmpty ? "Amount" : title, text: $stringValue, onEditingChanged: { editing in
+                    isEditing = editing
+                    if !editing {
+                        // Format the display when editing ends
+                        if let val = value {
+                            stringValue = String(format: "%.\(currency.decimalPlaces)f", val)
+                        }
+                    }
+                })
+                .textFieldStyle(FinancialTextFieldStyle(
+                    isEditing: isEditing,
+                    hasError: false,
+                    isFocused: isEditing
+                ))
+            }
+        }
         .onChange(of: stringValue) { _, newValue in
             // Update the value without formatting during editing
-            if let doubleValue = Double(newValue) {
+            if let doubleValue = parseUserNumber(newValue) {
                 value = doubleValue
-            } else if newValue.isEmpty {
+            } else if newValue.trimmingCharacters(in: .whitespaces).isEmpty {
                 value = nil
             }
         }
@@ -316,7 +385,7 @@ struct CurrencyInputField: View {
             // Only update string if not currently editing
             if !isEditing {
                 if let val = newValue {
-                    stringValue = String(format: "%.2f", val)
+                    stringValue = String(format: "%.\(currency.decimalPlaces)f", val)
                 } else if stringValue != "" {
                     stringValue = ""
                 }
@@ -356,32 +425,42 @@ struct PercentageInputField: View {
     }
     
     var body: some View {
-        HStack(spacing: 8) {
-            TextField(title, text: $stringValue, onEditingChanged: { editing in
-                isEditing = editing
-                if !editing {
-                    // Format the display when editing ends
-                    if let val = value {
-                        stringValue = String(format: "%.3f", val)
+        VStack(alignment: .leading, spacing: 6) {
+            if !title.isEmpty {
+                InputFieldHeader(
+                    title: title,
+                    subtitle: subtitle,
+                    isRequired: isRequired,
+                    helpText: helpText
+                )
+            }
+
+            HStack(spacing: 8) {
+                TextField(title.isEmpty ? "Rate" : title, text: $stringValue, onEditingChanged: { editing in
+                    isEditing = editing
+                    if !editing {
+                        // Format the display when editing ends
+                        if let val = value {
+                            stringValue = String(format: "%.3f", val)
+                        }
                     }
-                }
-            })
-            .textFieldStyle(FinancialTextFieldStyle(
-                isEditing: isEditing,
-                hasError: false,
-                isFocused: isEditing
-            ))
-            
-            Text("%")
-                .font(.system(.body, design: .monospaced))
-                .foregroundColor(.secondary)
-                .padding(.top, subtitle != nil ? 24 : 0)
+                })
+                .textFieldStyle(FinancialTextFieldStyle(
+                    isEditing: isEditing,
+                    hasError: false,
+                    isFocused: isEditing
+                ))
+
+                Text("%")
+                    .font(.system(.body, design: .monospaced))
+                    .foregroundColor(.secondary)
+            }
         }
         .onChange(of: stringValue) { _, newValue in
             // Update the value without formatting during editing
-            if let doubleValue = Double(newValue) {
+            if let doubleValue = parseUserNumber(newValue) {
                 value = doubleValue
-            } else if newValue.isEmpty {
+            } else if newValue.trimmingCharacters(in: .whitespaces).isEmpty {
                 value = nil
             }
         }

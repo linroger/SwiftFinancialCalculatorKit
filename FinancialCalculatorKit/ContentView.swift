@@ -61,6 +61,7 @@ struct SidebarView: View {
     @Query(sort: \OptionsCalculation.lastModified, order: .reverse) private var optionsCalculations: [OptionsCalculation]
     @Query(sort: \MathExpressionCalculation.lastModified, order: .reverse) private var mathCalculations: [MathExpressionCalculation]
     @Query(sort: \DepreciationCalculation.lastModified, order: .reverse) private var depreciationCalculations: [DepreciationCalculation]
+    @Query(sort: \CurrencyConversionCalculation.lastModified, order: .reverse) private var currencyCalculations: [CurrencyConversionCalculation]
 
     // Legacy support
     @Query private var legacyCalculations: [FinancialCalculation]
@@ -88,6 +89,16 @@ struct SidebarView: View {
                 ForEach(allRecentCalculations) { item in
                     RecentCalculationRowView(item: item)
                         .environment(viewModel)
+                        .contextMenu {
+                            Button(item.isFavorite ? "Remove from Favorites" : "Add to Favorites",
+                                   systemImage: item.isFavorite ? "heart.slash" : "heart") {
+                                toggleFavorite(item)
+                            }
+                            Divider()
+                            Button("Delete", systemImage: "trash", role: .destructive) {
+                                delete(item)
+                            }
+                        }
                 }
                 .onDelete(perform: deleteCalculations)
             }
@@ -203,7 +214,17 @@ struct SidebarView: View {
                 isFavorite: calc.isFavorite
             ))
         }
-        
+
+        for calc in currencyCalculations.prefix(2) {
+            items.append(RecentCalculationItem(
+                id: calc.id,
+                name: calc.name,
+                calculationType: .currency,
+                lastModified: calc.lastModified,
+                isFavorite: calc.isFavorite
+            ))
+        }
+
         // Filter by search text if needed
         var filtered = items
         if !viewModel.searchText.isEmpty {
@@ -223,8 +244,76 @@ struct SidebarView: View {
     }
     
     private func deleteCalculations(offsets: IndexSet) {
-        // Note: This simplified version just removes from view
-        // Full delete would require identifying which SwiftData model to delete from
+        let items = allRecentCalculations
+        for index in offsets where items.indices.contains(index) {
+            delete(items[index])
+        }
+    }
+
+    /// Delete the underlying SwiftData model backing a recent-calculation row.
+    private func delete(_ item: RecentCalculationItem) {
+        switch item.calculationType {
+        case .timeValue:
+            if let calc = timeValueCalculations.first(where: { $0.id == item.id }) {
+                modelContext.delete(calc)
+            }
+        case .loan, .mortgage:
+            if let calc = loanCalculations.first(where: { $0.id == item.id }) {
+                modelContext.delete(calc)
+            }
+        case .investment:
+            if let calc = investmentCalculations.first(where: { $0.id == item.id }) {
+                modelContext.delete(calc)
+            }
+        case .bond:
+            if let calc = bondCalculations.first(where: { $0.id == item.id }) {
+                modelContext.delete(calc)
+            }
+        case .options:
+            if let calc = optionsCalculations.first(where: { $0.id == item.id }) {
+                modelContext.delete(calc)
+            }
+        case .mathExpression:
+            if let calc = mathCalculations.first(where: { $0.id == item.id }) {
+                modelContext.delete(calc)
+            }
+        case .depreciation:
+            if let calc = depreciationCalculations.first(where: { $0.id == item.id }) {
+                modelContext.delete(calc)
+            }
+        case .currency:
+            if let calc = currencyCalculations.first(where: { $0.id == item.id }) {
+                modelContext.delete(calc)
+            }
+        case .conversion:
+            break
+        }
+        try? modelContext.save()
+    }
+
+    /// Toggle the favorite flag on the underlying SwiftData model.
+    private func toggleFavorite(_ item: RecentCalculationItem) {
+        switch item.calculationType {
+        case .timeValue:
+            timeValueCalculations.first(where: { $0.id == item.id })?.toggleFavorite()
+        case .loan, .mortgage:
+            loanCalculations.first(where: { $0.id == item.id })?.toggleFavorite()
+        case .investment:
+            investmentCalculations.first(where: { $0.id == item.id })?.toggleFavorite()
+        case .bond:
+            bondCalculations.first(where: { $0.id == item.id })?.toggleFavorite()
+        case .options:
+            optionsCalculations.first(where: { $0.id == item.id })?.toggleFavorite()
+        case .mathExpression:
+            mathCalculations.first(where: { $0.id == item.id })?.toggleFavorite()
+        case .depreciation:
+            depreciationCalculations.first(where: { $0.id == item.id })?.toggleFavorite()
+        case .currency:
+            currencyCalculations.first(where: { $0.id == item.id })?.toggleFavorite()
+        case .conversion:
+            break
+        }
+        try? modelContext.save()
     }
 }
 
@@ -746,13 +835,10 @@ struct FeatureCard: View {
 struct ShortcutsHelpContent: View {
     let shortcuts = [
         ("⌘ N", "New Calculation"),
-        ("⌘ S", "Save Calculation"),
-        ("⌘ E", "Export"),
         ("⌘ ,", "Preferences"),
-        ("⌘ F", "Search"),
-        ("⌘ 1-9", "Switch Calculator"),
-        ("⌘ ?", "Help"),
-        ("⌘ W", "Close Window")
+        ("⌘ ⇧ /", "Help"),
+        ("⌘ W", "Close Window"),
+        ("⌘ Q", "Quit")
     ]
     
     var body: some View {

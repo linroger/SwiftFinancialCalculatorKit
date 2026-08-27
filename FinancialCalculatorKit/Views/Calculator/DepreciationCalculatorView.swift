@@ -102,6 +102,7 @@ struct DepreciationCalculatorView: View {
                 assetCost: assetCost,
                 salvageValue: salvageValue,
                 usefulLife: usefulLife,
+                decliningBalanceRate: decliningBalanceRate,
                 currency: currency
             )
         }
@@ -182,14 +183,12 @@ struct DepreciationCalculatorView: View {
                             Text("Asset Cost")
                                 .font(.headline)
                                 .fontWeight(.medium)
-                            
+
                             Spacer()
-                            
-                            Button(action: {}) {
-                                Image(systemName: "questionmark.circle")
-                            }
-                            .buttonStyle(.plain)
-                            .help("The initial cost or acquisition value of the asset")
+
+                            Image(systemName: "questionmark.circle")
+                                .foregroundColor(.secondary)
+                                .help("The initial cost or acquisition value of the asset")
                         }
                         
                         CurrencyInputField(
@@ -208,14 +207,12 @@ struct DepreciationCalculatorView: View {
                             Text("Salvage Value")
                                 .font(.headline)
                                 .fontWeight(.medium)
-                            
+
                             Spacer()
-                            
-                            Button(action: {}) {
-                                Image(systemName: "questionmark.circle")
-                            }
-                            .buttonStyle(.plain)
-                            .help("The estimated value of the asset at the end of its useful life")
+
+                            Image(systemName: "questionmark.circle")
+                                .foregroundColor(.secondary)
+                                .help("The estimated value of the asset at the end of its useful life")
                         }
                         
                         CurrencyInputField(
@@ -234,33 +231,31 @@ struct DepreciationCalculatorView: View {
                             Text("Useful Life (Years)")
                                 .font(.headline)
                                 .fontWeight(.medium)
-                            
+
                             Spacer()
-                            
-                            Button(action: {}) {
-                                Image(systemName: "questionmark.circle")
-                            }
-                            .buttonStyle(.plain)
-                            .help("The expected productive life of the asset in years")
+
+                            Image(systemName: "questionmark.circle")
+                                .foregroundColor(.secondary)
+                                .help("The expected productive life of the asset in years")
                         }
                         
                         TextField("Years", value: $usefulLife, format: .number.precision(.fractionLength(0)))
                             .textFieldStyle(.roundedBorder)
                             .onChange(of: usefulLife) { _, newValue in
                                 usefulLife = max(1, newValue)
-                                currentYear = min(currentYear, usefulLife)
+                                currentYear = min(currentYear, Double(scheduleYears))
                                 clearResults()
                             }
                     }
-                    
+
                     // Current year
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Calculate Depreciation for Year")
                             .font(.headline)
                             .fontWeight(.medium)
-                        
+
                         Picker("Year", selection: $currentYear) {
-                            ForEach(1...Int(usefulLife), id: \.self) { year in
+                            ForEach(1...scheduleYears, id: \.self) { year in
                                 Text("Year \(year)").tag(Double(year))
                             }
                         }
@@ -296,6 +291,7 @@ struct DepreciationCalculatorView: View {
                         }
                         .pickerStyle(.radioGroup)
                         .onChange(of: method) { _, _ in
+                            currentYear = min(currentYear, Double(scheduleYears))
                             clearResults()
                         }
                     }
@@ -308,14 +304,12 @@ struct DepreciationCalculatorView: View {
                                     Text("Declining Balance Rate")
                                         .font(.headline)
                                         .fontWeight(.medium)
-                                    
+
                                     Spacer()
-                                    
-                                    Button(action: {}) {
-                                        Image(systemName: "questionmark.circle")
-                                    }
-                                    .buttonStyle(.plain)
-                                    .help("Common rates: 2.0 (double declining), 1.5 (150% declining)")
+
+                                    Image(systemName: "questionmark.circle")
+                                        .foregroundColor(.secondary)
+                                        .help("Common rates: 2.0 (double declining), 1.5 (150% declining)")
                                 }
                                 
                                 TextField("Rate", value: $decliningBalanceRate, format: .number.precision(.fractionLength(1)))
@@ -356,6 +350,7 @@ struct DepreciationCalculatorView: View {
                                 }
                                 .pickerStyle(.menu)
                                 .onChange(of: macrsClass) { _, _ in
+                                    currentYear = min(currentYear, Double(scheduleYears))
                                     clearResults()
                                 }
                             }
@@ -374,7 +369,7 @@ struct DepreciationCalculatorView: View {
                         .fontWeight(.medium)
                     
                     Picker("Currency", selection: $currency) {
-                        ForEach(Currency.allCases.prefix(8)) { curr in
+                        ForEach(Currency.allCases) { curr in
                             Text("\(curr.displayName) (\(curr.symbol))")
                                 .tag(curr)
                         }
@@ -574,7 +569,16 @@ struct DepreciationCalculatorView: View {
     }
     
     // MARK: - Helper Methods
-    
+
+    /// Mirrors DepreciationCalculation.scheduleYearCount: MACRS schedules run one
+    /// year past the recovery period (half-year convention).
+    private var scheduleYears: Int {
+        if method == .macrs, let macrsClass {
+            return macrsClass.depreciationRates.count
+        }
+        return max(1, Int(usefulLife.rounded(.up)))
+    }
+
     private var canCalculate: Bool {
         !calculationName.isEmpty &&
         assetCost > 0 &&
@@ -582,27 +586,26 @@ struct DepreciationCalculatorView: View {
         salvageValue < assetCost &&
         usefulLife > 0 &&
         currentYear > 0 &&
-        currentYear <= usefulLife &&
+        Int(currentYear) <= scheduleYears &&
         (method != .macrs || macrsClass != nil)
     }
-    
+
     private var canSave: Bool {
         canCalculate && calculationResult?.isValid == true
     }
-    
-    private var currentDepreciationData: (assetCost: Double, salvageValue: Double, usefulLife: Double, method: DepreciationMethod) {
-        (assetCost, salvageValue, usefulLife, method)
+
+    private var currentDepreciationData: (assetCost: Double, salvageValue: Double, usefulLife: Double, method: DepreciationMethod, decliningBalanceRate: Double, macrsClass: MACRSPropertyClass?) {
+        (assetCost, salvageValue, usefulLife, method, decliningBalanceRate, macrsClass)
     }
-    
+
     private func performCalculation() {
         guard canCalculate else {
             validateInputs()
             return
         }
-        
-        isCalculating = true
+
         validationErrors = []
-        
+
         // Create temporary calculation object
         let tempCalculation = DepreciationCalculation(
             name: calculationName,
@@ -614,19 +617,15 @@ struct DepreciationCalculatorView: View {
             decliningBalanceRate: decliningBalanceRate,
             currency: currency
         )
-        
+
         if method == .macrs {
             tempCalculation.macrsClass = macrsClass
         }
-        
-        // Perform calculation
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            calculationResult = tempCalculation.result
-            isCalculating = false
-            
-            if calculationResult?.isValid != true {
-                validationErrors = tempCalculation.validationErrors
-            }
+
+        calculationResult = tempCalculation.result
+
+        if calculationResult?.isValid != true {
+            validationErrors = tempCalculation.validationErrors
         }
     }
     
@@ -653,8 +652,8 @@ struct DepreciationCalculatorView: View {
             validationErrors.append("Useful life must be positive")
         }
         
-        if currentYear <= 0 || currentYear > usefulLife {
-            validationErrors.append("Current year must be between 1 and useful life")
+        if currentYear <= 0 || Int(currentYear) > scheduleYears {
+            validationErrors.append("Current year must be between 1 and \(scheduleYears)")
         }
         
         if method == .macrs && macrsClass == nil {
@@ -697,17 +696,53 @@ struct DepreciationCalculatorView: View {
             depreciationCalculation.macrsClass = macrsClass
         }
         
+        depreciationCalculation.updateTimestamp()
         modelContext.insert(depreciationCalculation)
-        
+
         do {
             try modelContext.save()
         } catch {
-            print("Failed to save calculation: \(error)")
+            mainViewModel.handleError(.fileAccessError("Failed to save calculation: \(error.localizedDescription)"))
         }
     }
-    
+
     private func exportResults() {
-        // Implementation for exporting results
+        guard let result = calculationResult, result.isValid else { return }
+
+        // Export the full schedule so the CSV is useful beyond the single year shown
+        let tempCalculation = DepreciationCalculation(
+            name: calculationName,
+            assetCost: assetCost,
+            salvageValue: salvageValue,
+            usefulLife: usefulLife,
+            currentYear: currentYear,
+            method: method,
+            decliningBalanceRate: decliningBalanceRate,
+            currency: currency
+        )
+        if method == .macrs {
+            tempCalculation.macrsClass = macrsClass
+        }
+
+        let schedule = tempCalculation.generateDepreciationSchedule()
+        let rows: [[String: String]] = schedule.map { entry in
+            [
+                "Year": "\(entry.year)",
+                "Depreciation": currency.formatValue(entry.depreciation),
+                "Cumulative Depreciation": currency.formatValue(entry.cumulativeDepreciation),
+                "Book Value": currency.formatValue(entry.bookValue)
+            ]
+        }
+
+        do {
+            try CalculationExporter.exportCSV(
+                suggestedName: calculationName.isEmpty ? "Depreciation Schedule" : calculationName,
+                headers: ["Year", "Depreciation", "Cumulative Depreciation", "Book Value"],
+                rows: rows
+            )
+        } catch {
+            mainViewModel.handleError(.dataExportFailed(error.localizedDescription))
+        }
     }
     
     private func formatSecondaryValue(key: String, value: Double) -> String {
@@ -797,7 +832,7 @@ struct DepreciationCalculatorView: View {
 // MARK: - Supporting Views
 
 struct DepreciationScheduleView: View {
-    let depreciationData: (assetCost: Double, salvageValue: Double, usefulLife: Double, method: DepreciationMethod)
+    let depreciationData: (assetCost: Double, salvageValue: Double, usefulLife: Double, method: DepreciationMethod, decliningBalanceRate: Double, macrsClass: MACRSPropertyClass?)
     let currency: Currency
     @Environment(\.dismiss) private var dismiss
     
@@ -867,9 +902,11 @@ struct DepreciationScheduleView: View {
             assetCost: depreciationData.assetCost,
             salvageValue: depreciationData.salvageValue,
             usefulLife: depreciationData.usefulLife,
-            method: depreciationData.method
+            method: depreciationData.method,
+            decliningBalanceRate: depreciationData.decliningBalanceRate
         )
-        
+        tempCalculation.macrsClass = depreciationData.macrsClass
+
         return tempCalculation.generateDepreciationSchedule()
     }
 }
@@ -878,8 +915,13 @@ struct MethodComparisonView: View {
     let assetCost: Double
     let salvageValue: Double
     let usefulLife: Double
+    let decliningBalanceRate: Double
     let currency: Currency
     @Environment(\.dismiss) private var dismiss
+
+    private var comparedMethods: [DepreciationMethod] {
+        DepreciationMethod.allCases.filter { $0 != .macrs }
+    }
     
     var body: some View {
         NavigationStack {
@@ -893,7 +935,7 @@ struct MethodComparisonView: View {
                     // Comparison chart
                     GroupBox("Annual Depreciation Comparison") {
                         Chart {
-                            ForEach(DepreciationMethod.allCases.filter { $0 != .macrs }, id: \.self) { method in
+                            ForEach(comparedMethods, id: \.self) { method in
                                 ForEach(generateMethodData(method: method), id: \.year) { point in
                                     LineMark(
                                         x: .value("Year", point.year),
@@ -933,7 +975,7 @@ struct MethodComparisonView: View {
                     // Method comparison table
                     GroupBox("Method Characteristics") {
                         VStack(alignment: .leading, spacing: 12) {
-                            ForEach(DepreciationMethod.allCases.filter { $0 != .macrs }, id: \.self) { method in
+                            ForEach(comparedMethods, id: \.self) { method in
                                 HStack {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(method.displayName)
@@ -942,16 +984,16 @@ struct MethodComparisonView: View {
                                             .font(.caption)
                                             .foregroundColor(.secondary)
                                     }
-                                    
+
                                     Spacer()
-                                    
+
                                     Text(calculateFirstYearDepreciation(method: method))
                                         .font(.system(.body, design: .monospaced))
                                         .fontWeight(.medium)
                                 }
                                 .padding(.vertical, 4)
-                                
-                                if method != DepreciationMethod.allCases.last {
+
+                                if method != comparedMethods.last {
                                     Divider()
                                 }
                             }
@@ -979,9 +1021,10 @@ struct MethodComparisonView: View {
             assetCost: assetCost,
             salvageValue: salvageValue,
             usefulLife: usefulLife,
-            method: method
+            method: method,
+            decliningBalanceRate: decliningBalanceRate
         )
-        
+
         let schedule = tempCalculation.generateDepreciationSchedule()
         return schedule.map { entry in
             MethodComparisonPoint(year: entry.year, depreciation: entry.depreciation)

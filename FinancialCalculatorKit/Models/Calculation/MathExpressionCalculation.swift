@@ -87,7 +87,14 @@ final class MathExpressionCalculation {
             )
         }
 
-        let calculatedValue = CalculationEngine.evaluateExpression(expression, with: variables) ?? 0.0
+        guard let calculatedValue = CalculationEngine.evaluateExpression(expression, with: variables),
+              calculatedValue.isFinite else {
+            return CalculationResult(
+                primaryValue: 0.0,
+                formattedPrimaryValue: "Could not evaluate",
+                explanation: "The expression could not be evaluated. Check the syntax and that every variable is defined."
+            )
+        }
 
         return CalculationResult(
             primaryValue: calculatedValue,

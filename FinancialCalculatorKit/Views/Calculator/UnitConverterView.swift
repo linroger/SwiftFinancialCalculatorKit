@@ -256,12 +256,18 @@ struct UnitConverterView: View {
                         )
                         
                         Divider()
-                        
-                        let conversionFactor = getConversionFactor()
-                        DetailRow(
-                            title: "Conversion Factor",
-                            value: "1 \(fromUnit) = \(String(format: "%.10g", conversionFactor)) \(toUnit)"
-                        )
+
+                        if let conversionFactor = getConversionFactor() {
+                            DetailRow(
+                                title: "Conversion Factor",
+                                value: "1 \(fromUnit) = \(String(format: "%.10g", conversionFactor)) \(toUnit)"
+                            )
+                        } else if selectedCategory == .temperature {
+                            DetailRow(
+                                title: "Conversion",
+                                value: "Scale conversion with offset (e.g. °F = °C × 9/5 + 32)"
+                            )
+                        }
                         
                         if let precision = getPrecisionInfo() {
                             DetailRow(
@@ -309,12 +315,13 @@ struct UnitConverterView: View {
             
             // Action buttons
             VStack(spacing: 12) {
-                Button("Save Conversion") {
+                Button("Add to History") {
                     saveConversion()
                 }
                 .buttonStyle(.bordered)
                 .frame(maxWidth: .infinity)
-                .disabled(outputValue == 0)
+                .disabled(!unitsResolved)
+                .help("Keeps this conversion in the session history (cleared when the app quits)")
                 
                 Button("View History") {
                     showingHistory = true
@@ -329,7 +336,7 @@ struct UnitConverterView: View {
     
     @ViewBuilder
     private var historySection: some View {
-        GroupBox("Recent Conversions") {
+        GroupBox("Session History") {
             VStack(spacing: 8) {
                 ForEach(conversionHistory.suffix(5)) { record in
                     HStack {
@@ -367,14 +374,48 @@ struct UnitConverterView: View {
         }
     }
     
+    /// Whether both selected unit symbols resolve in the current category
+    private var unitsResolved: Bool {
+        getUnitInfo(fromUnit) != nil && getUnitInfo(toUnit) != nil
+    }
+
     private func performConversion() {
-        guard !fromUnit.isEmpty && !toUnit.isEmpty else {
+        guard !fromUnit.isEmpty && !toUnit.isEmpty, unitsResolved else {
             outputValue = 0
             return
         }
-        
-        let factor = getConversionFactor()
+
+        // Temperature scales are affine (offset + scale), not purely multiplicative
+        if selectedCategory == .temperature {
+            outputValue = Self.convertTemperature(inputValue, from: fromUnit, to: toUnit) ?? 0
+            return
+        }
+
+        guard let factor = getConversionFactor() else {
+            outputValue = 0
+            return
+        }
         outputValue = inputValue * factor
+    }
+
+    /// Convert between temperature scales via Celsius. Returns nil for unknown symbols.
+    static func convertTemperature(_ value: Double, from: String, to: String) -> Double? {
+        let celsius: Double
+        switch from {
+        case "°C": celsius = value
+        case "°F": celsius = (value - 32) * 5 / 9
+        case "K": celsius = value - 273.15
+        case "°R": celsius = (value - 491.67) * 5 / 9
+        default: return nil
+        }
+
+        switch to {
+        case "°C": return celsius
+        case "°F": return celsius * 9 / 5 + 32
+        case "K": return celsius + 273.15
+        case "°R": return (celsius + 273.15) * 9 / 5
+        default: return nil
+        }
     }
     
     private func swapUnits() {
@@ -396,12 +437,15 @@ struct UnitConverterView: View {
         conversionHistory.append(record)
     }
     
-    private func getConversionFactor() -> Double {
-        guard let fromUnitData = selectedCategory.units.first(where: { $0.symbol == fromUnit }),
+    /// Multiplicative conversion factor between the selected units.
+    /// `nil` for unknown units or for temperature, which is not a pure scaling.
+    private func getConversionFactor() -> Double? {
+        guard selectedCategory != .temperature,
+              let fromUnitData = selectedCategory.units.first(where: { $0.symbol == fromUnit }),
               let toUnitData = selectedCategory.units.first(where: { $0.symbol == toUnit }) else {
-            return 1.0
+            return nil
         }
-        
+
         // Convert from source unit to base unit, then to target unit
         return fromUnitData.toBaseUnitFactor / toUnitData.toBaseUnitFactor
     }
@@ -508,7 +552,7 @@ struct ConversionHistoryView: View {
                     }
                 }
             }
-            .navigationTitle("Conversion History")
+            .navigationTitle("Session History")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     if !history.isEmpty {
@@ -643,6 +687,7 @@ enum UnitCategory: String, CaseIterable, Identifiable {
                 UnitInfo(symbol: "km²", name: "Square Kilometer", toBaseUnitFactor: 1000000.0),
                 UnitInfo(symbol: "in²", name: "Square Inch", toBaseUnitFactor: 0.00064516),
                 UnitInfo(symbol: "ft²", name: "Square Foot", toBaseUnitFactor: 0.092903),
+                UnitInfo(symbol: "mi²", name: "Square Mile", toBaseUnitFactor: 2589988.110336),
                 UnitInfo(symbol: "ac", name: "Acre", toBaseUnitFactor: 4046.86),
                 UnitInfo(symbol: "ha", name: "Hectare", toBaseUnitFactor: 10000.0)
             ]

@@ -85,3 +85,9 @@ fastlane/test_output
 # https://github.com/johnno1962/injectionforxcode
 
 iOSInjectionProject/
+# Project-local build and session artifacts
+.derivedData/
+.build/
+.remember/
+logs/
+.DS_Store

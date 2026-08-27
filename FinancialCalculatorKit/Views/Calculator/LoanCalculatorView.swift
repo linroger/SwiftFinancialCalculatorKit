@@ -28,6 +28,7 @@ struct LoanCalculatorView: View {
     @State private var calculationResult: CalculationResult?
     @State private var validationErrors: [String] = []
     @State private var showAmortizationTable: Bool = false
+    @State private var didSave: Bool = false
     
     private var isMortgage: Bool {
         loanType == .mortgage
@@ -70,11 +71,11 @@ struct LoanCalculatorView: View {
                     .buttonStyle(.bordered)
                 }
                 
-                Button("Save") {
+                Button(didSave ? "Saved" : "Save", systemImage: didSave ? "checkmark" : "square.and.arrow.down") {
                     saveCalculation()
                 }
-                .disabled(calculationResult == nil || calculationName.isEmpty)
-                
+                .disabled(calculationResult == nil || calculationName.isEmpty || didSave)
+
                 Button("Clear") {
                     clearAll()
                 }
@@ -84,6 +85,14 @@ struct LoanCalculatorView: View {
         .onAppear {
             loadUserPreferences()
         }
+        .onChange(of: principalAmount) { clearResults() }
+        .onChange(of: annualInterestRate) { clearResults() }
+        .onChange(of: loanTermYears) { clearResults() }
+        .onChange(of: downPayment) { clearResults() }
+        .onChange(of: extraPayment) { clearResults() }
+        .onChange(of: paymentFrequency) { clearResults() }
+        .onChange(of: loanType) { clearResults() }
+        .onChange(of: currency) { clearResults() }
     }
     
     @ViewBuilder
@@ -371,21 +380,34 @@ struct LoanCalculatorView: View {
     
     private func saveCalculation() {
         guard let calc = calculation else { return }
-        
+
+        calc.updateTimestamp()
         modelContext.insert(calc)
-        
+
         do {
             try modelContext.save()
-            
-            // Show success feedback
+
             withAnimation(.easeInOut(duration: 0.2)) {
-                // Could add a success indicator here
+                didSave = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    didSave = false
+                }
             }
         } catch {
             mainViewModel.handleError(.dataExportFailed("Failed to save calculation: \(error.localizedDescription)"))
         }
     }
-    
+
+    private func clearResults() {
+        calculationResult = nil
+        calculation = nil
+        validationErrors = []
+        showAmortizationTable = false
+        didSave = false
+    }
+
     private func clearAll() {
         withAnimation(.easeInOut(duration: 0.3)) {
             principalAmount = nil
@@ -394,9 +416,11 @@ struct LoanCalculatorView: View {
             downPayment = nil
             extraPayment = nil
             calculationResult = nil
+            calculation = nil
             validationErrors = []
             calculationName = ""
             showAmortizationTable = false
+            didSave = false
         }
     }
     
@@ -706,7 +730,7 @@ struct LoanInsightsView: View {
         }
         
         if principalAmount > 0 {
-            tips.append(("Extra Payments", "Adding just $50-100 extra per payment can save thousands in interest"))
+            tips.append(("Extra Payments", "Adding even a small extra amount to each payment can substantially reduce total interest"))
         }
         
         if isMortgage {

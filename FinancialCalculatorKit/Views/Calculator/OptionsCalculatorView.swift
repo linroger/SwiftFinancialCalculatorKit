@@ -141,7 +141,7 @@ struct OptionsCalculatorView: View {
                 .frame(height: 40)
                 .padding(.vertical, 8)
             
-            Text("where $d_1 = \\frac{\\ln(S_0/K) + (r + \\sigma^2/2)T}{\\sigma\\sqrt{T}}$ and $d_2 = d_1 - \\sigma\\sqrt{T}$")
+            LaTeX("where $d_1 = \\frac{\\ln(S_0/K) + (r + \\sigma^2/2)T}{\\sigma\\sqrt{T}}$ and $d_2 = d_1 - \\sigma\\sqrt{T}$")
                 .font(.caption)
                 .foregroundColor(.secondary)
             
@@ -202,14 +202,12 @@ struct OptionsCalculatorView: View {
                             Text("Current Stock Price (S₀)")
                                 .font(.headline)
                                 .fontWeight(.medium)
-                            
+
                             Spacer()
-                            
-                            Button(action: {}) {
-                                Image(systemName: "questionmark.circle")
-                            }
-                            .buttonStyle(.plain)
-                            .help("Current market price of the underlying asset")
+
+                            Image(systemName: "questionmark.circle")
+                                .foregroundColor(.secondary)
+                                .help("Current market price of the underlying asset")
                         }
                         
                         CurrencyInputField(
@@ -231,14 +229,12 @@ struct OptionsCalculatorView: View {
                             Text("Strike Price (K)")
                                 .font(.headline)
                                 .fontWeight(.medium)
-                            
+
                             Spacer()
-                            
-                            Button(action: {}) {
-                                Image(systemName: "questionmark.circle")
-                            }
-                            .buttonStyle(.plain)
-                            .help("Exercise price of the option")
+
+                            Image(systemName: "questionmark.circle")
+                                .foregroundColor(.secondary)
+                                .help("Exercise price of the option")
                         }
                         
                         CurrencyInputField(
@@ -260,14 +256,12 @@ struct OptionsCalculatorView: View {
                             Text("Time to Expiry (Years)")
                                 .font(.headline)
                                 .fontWeight(.medium)
-                            
+
                             Spacer()
-                            
-                            Button(action: {}) {
-                                Image(systemName: "questionmark.circle")
-                            }
-                            .buttonStyle(.plain)
-                            .help("Time remaining until option expiration")
+
+                            Image(systemName: "questionmark.circle")
+                                .foregroundColor(.secondary)
+                                .help("Time remaining until option expiration")
                         }
                         
                         TextField("Years", value: $timeToExpiry, format: .number.precision(.fractionLength(4)))
@@ -291,14 +285,12 @@ struct OptionsCalculatorView: View {
                             Text("Risk-Free Rate (%)")
                                 .font(.headline)
                                 .fontWeight(.medium)
-                            
+
                             Spacer()
-                            
-                            Button(action: {}) {
-                                Image(systemName: "questionmark.circle")
-                            }
-                            .buttonStyle(.plain)
-                            .help("Risk-free interest rate (e.g., Treasury rate)")
+
+                            Image(systemName: "questionmark.circle")
+                                .foregroundColor(.secondary)
+                                .help("Risk-free interest rate (e.g., Treasury rate)")
                         }
                         
                         PercentageInputField(
@@ -323,14 +315,12 @@ struct OptionsCalculatorView: View {
                             Text("Volatility (σ %)")
                                 .font(.headline)
                                 .fontWeight(.medium)
-                            
+
                             Spacer()
-                            
-                            Button(action: {}) {
-                                Image(systemName: "questionmark.circle")
-                            }
-                            .buttonStyle(.plain)
-                            .help("Annualized volatility of the underlying asset")
+
+                            Image(systemName: "questionmark.circle")
+                                .foregroundColor(.secondary)
+                                .help("Annualized volatility of the underlying asset")
                         }
                         
                         PercentageInputField(
@@ -361,7 +351,7 @@ struct OptionsCalculatorView: View {
                         .fontWeight(.medium)
                     
                     Picker("Currency", selection: $currency) {
-                        ForEach(Currency.allCases.prefix(8)) { curr in
+                        ForEach(Currency.allCases) { curr in
                             Text("\(curr.displayName) (\(curr.symbol))")
                                 .tag(curr)
                         }
@@ -560,9 +550,8 @@ struct OptionsCalculatorView: View {
             return
         }
         
-        isCalculating = true
         validationErrors = []
-        
+
         let tempCalculation = OptionsCalculation(
             name: calculationName,
             spotPrice: spotPrice,
@@ -574,14 +563,11 @@ struct OptionsCalculatorView: View {
             currency: currency
         )
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            calculationResult = tempCalculation.result
-            if !tempCalculation.isValid {
-                validationErrors = tempCalculation.validationErrors
-            } else {
-                calculation = tempCalculation
-            }
-            isCalculating = false
+        calculationResult = tempCalculation.result
+        if !tempCalculation.isValid {
+            validationErrors = tempCalculation.validationErrors
+        } else {
+            calculation = tempCalculation
         }
     }
     
@@ -612,11 +598,12 @@ struct OptionsCalculatorView: View {
     
     private func saveCalculation() {
         guard let calc = calculation, calc.isValid else { return }
+        calc.updateTimestamp()
         modelContext.insert(calc)
         do {
             try modelContext.save()
         } catch {
-            print("Failed to save calculation: \(error)")
+            mainViewModel.handleError(.fileAccessError("Failed to save calculation: \(error.localizedDescription)"))
         }
     }
     

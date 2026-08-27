@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import Combine
 
 struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
@@ -18,6 +19,8 @@ struct DashboardView: View {
     @Query(sort: \InvestmentCalculation.lastModified, order: .reverse) private var recentInvestments: [InvestmentCalculation]
     @Query(sort: \OptionsCalculation.lastModified, order: .reverse) private var recentOptions: [OptionsCalculation]
     @Query(sort: \MathExpressionCalculation.lastModified, order: .reverse) private var recentMath: [MathExpressionCalculation]
+    @Query(sort: \BondCalculation.lastModified, order: .reverse) private var recentBonds: [BondCalculation]
+    @Query(sort: \DepreciationCalculation.lastModified, order: .reverse) private var recentDepreciation: [DepreciationCalculation]
     
     @State private var currentTime = Date()
     let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
@@ -34,7 +37,7 @@ struct DashboardView: View {
                 // Quick Actions Grid
                 quickActionsSection
 
-                // Market Overview (Mock Data)
+                // Market Overview (static sample data, labeled as such)
                 MarketOverviewView()
                     .padding(.horizontal)
                 
@@ -141,9 +144,10 @@ struct DashboardView: View {
     }
     
     private var totalCalculations: Int {
-        recentTVM.count + recentLoans.count + recentInvestments.count + recentOptions.count + recentMath.count
+        recentTVM.count + recentLoans.count + recentInvestments.count + recentOptions.count
+            + recentMath.count + recentBonds.count + recentDepreciation.count
     }
-    
+
     private var calculationsThisWeek: Int {
         let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
         var count = 0
@@ -152,9 +156,11 @@ struct DashboardView: View {
         count += recentInvestments.filter { $0.lastModified > weekAgo }.count
         count += recentOptions.filter { $0.lastModified > weekAgo }.count
         count += recentMath.filter { $0.lastModified > weekAgo }.count
+        count += recentBonds.filter { $0.lastModified > weekAgo }.count
+        count += recentDepreciation.filter { $0.lastModified > weekAgo }.count
         return count
     }
-    
+
     private var favoriteCount: Int {
         var count = 0
         count += recentTVM.filter { $0.isFavorite }.count
@@ -162,9 +168,11 @@ struct DashboardView: View {
         count += recentInvestments.filter { $0.isFavorite }.count
         count += recentOptions.filter { $0.isFavorite }.count
         count += recentMath.filter { $0.isFavorite }.count
+        count += recentBonds.filter { $0.isFavorite }.count
+        count += recentDepreciation.filter { $0.isFavorite }.count
         return count
     }
-    
+
     private var categoriesUsed: Int {
         var categories = Set<String>()
         if !recentTVM.isEmpty { categories.insert("TVM") }
@@ -172,6 +180,8 @@ struct DashboardView: View {
         if !recentInvestments.isEmpty { categories.insert("Investment") }
         if !recentOptions.isEmpty { categories.insert("Options") }
         if !recentMath.isEmpty { categories.insert("Math") }
+        if !recentBonds.isEmpty { categories.insert("Bonds") }
+        if !recentDepreciation.isEmpty { categories.insert("Depreciation") }
         return categories.count
     }
     
@@ -342,6 +352,32 @@ struct DashboardView: View {
                 result: item.result.formattedPrimaryValue,
                 icon: "x.squareroot",
                 calculationType: .mathExpression,
+                calculationId: item.id
+            ))
+        }
+
+        for item in recentBonds.prefix(5) {
+            items.append(ActivityItem(
+                id: item.id,
+                title: item.name,
+                subtitle: "Bond Calculator",
+                date: item.lastModified,
+                result: item.result.formattedPrimaryValue,
+                icon: "building.columns",
+                calculationType: .bond,
+                calculationId: item.id
+            ))
+        }
+
+        for item in recentDepreciation.prefix(5) {
+            items.append(ActivityItem(
+                id: item.id,
+                title: item.name,
+                subtitle: "Depreciation Schedule",
+                date: item.lastModified,
+                result: item.result.formattedPrimaryValue,
+                icon: "arrow.down.right.circle",
+                calculationType: .depreciation,
                 calculationId: item.id
             ))
         }
@@ -561,15 +597,16 @@ struct MarketOverviewView: View {
                     
                     Spacer()
                     
-                    Text("Live Data")
+                    Text("Sample Data")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(
                             Capsule()
-                                .fill(Color.green.opacity(0.15))
+                                .fill(Color.secondary.opacity(0.15))
                         )
+                        .help("Illustrative figures only — not live market quotes")
                     
                     Button(action: { withAnimation { isExpanded.toggle() }}) {
                         Image(systemName: "chevron.down")
@@ -592,6 +629,11 @@ struct MarketOverviewView: View {
                         MarketMetric(name: "Gold", value: "$2,342.50", change: "+0.87%", isPositive: true, icon: "bitcoinsign.circle")
                     }
                     .padding(.top, 8)
+
+                    Text("Static sample figures for layout illustration — this app does not fetch market data.")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .padding()

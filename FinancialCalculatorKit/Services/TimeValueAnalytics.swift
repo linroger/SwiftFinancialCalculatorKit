@@ -51,14 +51,16 @@ enum TVMAnalysisEngine {
     ) -> TVMAnalysisSnapshot? {
         let resolvedPresentValue = solveFor == .presentValue ? (result?.primaryValue ?? 0) : (presentValue ?? 0)
         let resolvedFutureValue = solveFor == .futureValue ? (result?.primaryValue ?? 0) : (futureValue ?? 0)
-        let resolvedPayment = solveFor == .payment ? abs(result?.primaryValue ?? 0) : abs(payment ?? 0)
+        // Preserve the payment's sign: negative means a withdrawal from the balance
+        let resolvedPayment = solveFor == .payment ? (result?.primaryValue ?? 0) : (payment ?? 0)
         let annualRate = solveFor == .interestRate ? (result?.primaryValue ?? 0) : (annualInterestRate ?? 0)
         let years = solveFor == .numberOfYears ? (result?.primaryValue ?? 0) : (numberOfYears ?? 0)
 
-        guard annualRate >= 0, years > 0 else { return nil }
+        guard annualRate >= 0, years > 0, years.isFinite, annualRate.isFinite else { return nil }
 
         let effectiveAnnualRate = pow(1 + (annualRate / 100 / paymentFrequency.periodsPerYear), paymentFrequency.periodsPerYear) - 1
-        let periods = max(Int(paymentFrequency.numberOfPeriods(from: years)), 1)
+        // Cap the simulated series so extreme horizons stay renderable
+        let periods = min(max(Int(paymentFrequency.numberOfPeriods(from: years).rounded()), 1), 1200)
         let ratePerPeriod = annualRate / 100 / paymentFrequency.periodsPerYear
 
         var growthTimeline: [ChartDataPoint] = [
@@ -72,14 +74,14 @@ enum TVMAnalysisEngine {
         var cumulativePrincipal = resolvedPresentValue
 
         for period in 1...periods {
-            if paymentsAtBeginning && resolvedPayment > 0 {
+            if paymentsAtBeginning && resolvedPayment != 0 {
                 balance += resolvedPayment
                 cumulativePrincipal += resolvedPayment
             }
 
             balance *= (1 + ratePerPeriod)
 
-            if !paymentsAtBeginning && resolvedPayment > 0 {
+            if !paymentsAtBeginning && resolvedPayment != 0 {
                 balance += resolvedPayment
                 cumulativePrincipal += resolvedPayment
             }
@@ -109,7 +111,8 @@ enum TVMAnalysisEngine {
 
         return TVMAnalysisSnapshot(
             resolvedPresentValue: resolvedPresentValue,
-            resolvedFutureValue: max(resolvedFutureValue, endBalance),
+            // Prefer the user-entered or solved target; fall back to the simulated balance
+            resolvedFutureValue: resolvedFutureValue != 0 ? resolvedFutureValue : endBalance,
             resolvedPayment: resolvedPayment,
             annualRate: annualRate,
             effectiveAnnualRate: effectiveAnnualRate * 100,

@@ -14,7 +14,6 @@ struct BondCalculatorView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(MainViewModel.self) private var mainViewModel
     
-    @State private var calculation: BondCalculation?
     @State private var calculationName: String = ""
     @State private var faceValue: Double = 1000.0
     @State private var couponRate: Double = 5.0
@@ -30,7 +29,8 @@ struct BondCalculatorView: View {
     @State private var validationErrors: [String] = []
     @State private var showingSensitivityAnalysis: Bool = false
     @State private var showingCashFlowSchedule: Bool = false
-    
+    @State private var showingSaveConfirmation: Bool = false
+
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
@@ -90,7 +90,8 @@ struct BondCalculatorView: View {
             if let result = calculationResult {
                 CashFlowScheduleView(
                     cashFlows: result.chartData ?? [],
-                    bondData: currentBondData
+                    bondData: currentBondData,
+                    currency: currency
                 )
             }
         }
@@ -123,7 +124,14 @@ struct BondCalculatorView: View {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundColor(.green)
                     }
-                    
+
+                    if showingSaveConfirmation {
+                        Label("Saved", systemImage: "checkmark.circle.fill")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                            .transition(.opacity)
+                    }
+
                     Text("Bond Analysis Tool")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -193,14 +201,12 @@ struct BondCalculatorView: View {
                 Text("Face Value (Par Value)")
                     .font(.headline)
                     .fontWeight(.medium)
-                
+
                 Spacer()
-                
-                Button(action: {}) {
-                    Image(systemName: "questionmark.circle")
-                }
-                .buttonStyle(.plain)
-                .help("The amount paid to the bondholder at maturity")
+
+                Image(systemName: "questionmark.circle")
+                    .foregroundColor(.secondary)
+                    .help("The amount paid to the bondholder at maturity")
             }
             
             CurrencyInputField(
@@ -226,14 +232,12 @@ struct BondCalculatorView: View {
                 Text("Coupon Rate (Annual %)")
                     .font(.headline)
                     .fontWeight(.medium)
-                
+
                 Spacer()
-                
-                Button(action: {}) {
-                    Image(systemName: "questionmark.circle")
-                }
-                .buttonStyle(.plain)
-                .help("Annual interest rate paid by the bond")
+
+                Image(systemName: "questionmark.circle")
+                    .foregroundColor(.secondary)
+                    .help("Annual interest rate paid by the bond")
             }
             
             PercentageInputField(
@@ -260,14 +264,12 @@ struct BondCalculatorView: View {
                 Text("Years to Maturity")
                     .font(.headline)
                     .fontWeight(.medium)
-                
+
                 Spacer()
-                
-                Button(action: {}) {
-                    Image(systemName: "questionmark.circle")
-                }
-                .buttonStyle(.plain)
-                .help("Time until the bond matures")
+
+                Image(systemName: "questionmark.circle")
+                    .foregroundColor(.secondary)
+                    .help("Time until the bond matures")
             }
             
             TextField("Years", value: $yearsToMaturity, format: .number.precision(.fractionLength(1)))
@@ -357,14 +359,12 @@ struct BondCalculatorView: View {
                 Text("Required Yield (Market Rate %)")
                     .font(.headline)
                     .fontWeight(.medium)
-                
+
                 Spacer()
-                
-                Button(action: {}) {
-                    Image(systemName: "questionmark.circle")
-                }
-                .buttonStyle(.plain)
-                .help("The market interest rate for bonds of similar risk")
+
+                Image(systemName: "questionmark.circle")
+                    .foregroundColor(.secondary)
+                    .help("The market interest rate for bonds of similar risk")
             }
             
             PercentageInputField(
@@ -389,22 +389,20 @@ struct BondCalculatorView: View {
                 Text("Current Market Price")
                     .font(.headline)
                     .fontWeight(.medium)
-                
+
                 Spacer()
-                
-                Button(action: {}) {
-                    Image(systemName: "questionmark.circle")
-                }
-                .buttonStyle(.plain)
-                .help("The current trading price of the bond")
+
+                Image(systemName: "questionmark.circle")
+                    .foregroundColor(.secondary)
+                    .help("The current trading price of the bond")
             }
             
             CurrencyInputField(
                 title: "Current Price",
                 value: Binding(
-                    get: { currentPrice ?? 0.0 },
-                    set: { 
-                        currentPrice = max(0, $0 ?? 0)
+                    get: { currentPrice },
+                    set: {
+                        currentPrice = $0.map { max(0, $0) }
                         clearResults()
                     }
                 ),
@@ -726,24 +724,42 @@ struct BondCalculatorView: View {
             bondCalculation.currentPrice = currentPrice
         }
         
+        bondCalculation.updateTimestamp()
         modelContext.insert(bondCalculation)
-        
+
         do {
             try modelContext.save()
-            // Could show success message here
+            withAnimation {
+                showingSaveConfirmation = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                withAnimation {
+                    showingSaveConfirmation = false
+                }
+            }
         } catch {
-            // Handle save error
-            print("Failed to save calculation: \(error)")
+            mainViewModel.handleError(.dataExportFailed("Failed to save calculation: \(error.localizedDescription)"))
         }
     }
-    
+
     private func exportResults() {
-        // Implementation for exporting results
-        // This would include CSV/PDF export functionality
+        guard let result = calculationResult else { return }
+
+        do {
+            try CalculationExporter.exportResult(
+                suggestedName: calculationName.isEmpty ? "Bond Analysis" : calculationName,
+                primaryLabel: solveFor.displayName,
+                result: result
+            )
+        } catch {
+            mainViewModel.handleError(.dataExportFailed("Failed to export results: \(error.localizedDescription)"))
+        }
     }
-    
+
     private func formatSecondaryValue(key: String, value: Double) -> String {
-        if key.contains("Rate") || key.contains("Yield") || key.contains("%") {
+        if key == "Total Payments" {
+            return String(format: "%.0f", value)
+        } else if key.contains("Rate") || key.contains("Yield") || key.contains("%") {
             return String(format: "%.3f%%", value)
         } else if key.contains("Premium") || key.contains("Discount") || key.contains("Value") || key.contains("Price") || key.contains("Coupon") {
             return currency.formatValue(value)
@@ -956,8 +972,9 @@ struct SensitivityAnalysisView: View {
 struct CashFlowScheduleView: View {
     let cashFlows: [ChartDataPoint]
     let bondData: (faceValue: Double, couponRate: Double, yearsToMaturity: Double, paymentsPerYear: Double)
+    let currency: Currency
     @Environment(\.dismiss) private var dismiss
-    
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -965,10 +982,10 @@ struct CashFlowScheduleView: View {
                     // Summary
                     GroupBox("Cash Flow Summary") {
                         VStack(alignment: .leading, spacing: 12) {
-                            DetailRow(title: "Total Coupon Payments", value: "\(Int(bondData.yearsToMaturity * bondData.paymentsPerYear))")
-                            DetailRow(title: "Coupon per Payment", value: String(format: "$%.2f", bondData.faceValue * bondData.couponRate / 100 / bondData.paymentsPerYear))
-                            DetailRow(title: "Total Interest", value: String(format: "$%.2f", bondData.faceValue * bondData.couponRate / 100 * bondData.yearsToMaturity))
-                            DetailRow(title: "Principal at Maturity", value: String(format: "$%.2f", bondData.faceValue))
+                            DetailRow(title: "Number of Coupon Payments", value: "\(Int(bondData.yearsToMaturity * bondData.paymentsPerYear))")
+                            DetailRow(title: "Coupon per Payment", value: currency.formatValue(bondData.faceValue * bondData.couponRate / 100 / bondData.paymentsPerYear))
+                            DetailRow(title: "Total Interest", value: currency.formatValue(bondData.faceValue * bondData.couponRate / 100 * bondData.yearsToMaturity))
+                            DetailRow(title: "Principal at Maturity", value: currency.formatValue(bondData.faceValue))
                         }
                         .padding()
                     }
@@ -987,7 +1004,7 @@ struct CashFlowScheduleView: View {
                             .width(150)
                             
                             TableColumn("Amount") { flow in
-                                Text("$\(flow.y, specifier: "%.2f")")
+                                Text(currency.formatValue(flow.y))
                                     .font(.system(.body, design: .monospaced))
                             }
                             .width(120)

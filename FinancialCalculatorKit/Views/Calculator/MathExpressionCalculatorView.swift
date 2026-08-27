@@ -23,11 +23,7 @@ struct MathExpressionCalculatorView: View {
     @State private var selectedExample: ExampleExpression?
     @State private var showingVariableEditor: Bool = false
     @State private var errorMessage: String?
-    
-    // Variables editor
-    @State private var newVariableName: String = ""
-    @State private var newVariableValue: String = ""
-    
+
     let examples: [ExampleExpression] = [
         ExampleExpression(
             name: "Compound Interest",
@@ -43,15 +39,15 @@ struct MathExpressionCalculatorView: View {
         ),
         ExampleExpression(
             name: "Black-Scholes d1",
-            expression: "(log(S/K) + (r + 0.5*sigma^2)*T) / (sigma*sqrt(T))",
+            expression: "(ln(S/K) + (r + 0.5*sigma^2)*T) / (sigma*sqrt(T))",
             description: "Black-Scholes d1 parameter",
             variables: ["S": 100, "K": 100, "r": 0.05, "sigma": 0.2, "T": 0.25]
         ),
         ExampleExpression(
-            name: "Bond Duration",
-            expression: "sum(t * CF_t / (1+y)^t) / P",
-            description: "Macaulay Duration calculation (simplified)",
-            variables: ["t": 5, "CF_t": 50, "y": 0.05, "P": 1000]
+            name: "Gordon Growth Model",
+            expression: "D / (r - g)",
+            description: "Stock value from next dividend D, required return r, growth g",
+            variables: ["D": 2.5, "r": 0.08, "g": 0.03]
         ),
         ExampleExpression(
             name: "Sharpe Ratio",
@@ -113,16 +109,8 @@ struct MathExpressionCalculatorView: View {
         .onAppear {
             // Load default variables
             if variables.isEmpty {
-                variables = [
-                    "pi": Double.pi,
-                    "e": 2.718281828459045,
-                    "sqrt2": sqrt(2),
-                    "phi": (1 + sqrt(5)) / 2 // Golden ratio
-                ]
+                variables = defaultVariables
             }
-
-            // Note: Editing existing calculations would be loaded from a query
-            // based on selectedCalculationId if needed
         }
     }
     
@@ -182,9 +170,9 @@ struct MathExpressionCalculatorView: View {
                 // Function reference
                 DisclosureGroup("Available Functions") {
                     VStack(alignment: .leading, spacing: 4) {
-                        functionReferenceItem("Basic", "sin, cos, tan, log, exp, sqrt, abs, pow")
-                        functionReferenceItem("Financial", "pv, fv, pmt, npv, irr (custom functions)")
-                        functionReferenceItem("Statistical", "min, max, avg (for arrays)")
+                        functionReferenceItem("Trigonometric", "sin, cos, tan, asin, acos, atan")
+                        functionReferenceItem("Exponential", "exp, ln, log2, log10, sqrt, cbrt, x^y")
+                        functionReferenceItem("Other", "abs, ceil, floor, round, sgn, hypot, atan2")
                         functionReferenceItem("Constants", "pi, e, sqrt2, phi")
                     }
                 }
@@ -419,26 +407,18 @@ struct MathExpressionCalculatorView: View {
     
     private func evaluateExpression() {
         guard !expression.isEmpty else { return }
-        
+
         errorMessage = nil
-        
-        // Try Expression parser first
-        if let expressionResult = CalculationEngine.evaluateExpression(expression, with: variables) {
-            result = expressionResult
-            addToHistory()
+
+        guard let expressionResult = CalculationEngine.evaluateExpression(expression, with: variables),
+              expressionResult.isFinite else {
+            errorMessage = "Could not evaluate — check variables and syntax."
+            result = nil
             return
         }
-        
-        // Try MathParser as fallback
-        if let mathResult = CalculationEngine.evaluateMathExpression(expression) {
-            result = mathResult
-            addToHistory()
-            return
-        }
-        
-        // If both fail, show error
-        errorMessage = "Unable to evaluate expression. Check syntax and variable names."
-        result = nil
+
+        result = expressionResult
+        addToHistory()
     }
     
     private func addToHistory() {
@@ -463,6 +443,17 @@ struct MathExpressionCalculatorView: View {
         expression = ""
         result = nil
         errorMessage = nil
+        calculationName = "My Expression"
+        variables = defaultVariables
+    }
+
+    private var defaultVariables: [String: Double] {
+        [
+            "pi": Double.pi,
+            "e": 2.718281828459045,
+            "sqrt2": sqrt(2),
+            "phi": (1 + sqrt(5)) / 2 // Golden ratio
+        ]
     }
     
     private func loadExample(_ example: ExampleExpression) {
@@ -481,12 +472,13 @@ struct MathExpressionCalculatorView: View {
             expression: expression,
             variables: variables
         )
+        calc.updateTimestamp()
         modelContext.insert(calc)
 
         do {
             try modelContext.save()
         } catch {
-            print("Failed to save calculation: \(error)")
+            mainViewModel.handleError(.dataExportFailed("Could not save the calculation: \(error.localizedDescription)"))
         }
     }
 

@@ -149,15 +149,26 @@ enum Currency: String, CaseIterable, Identifiable, Codable {
         }
     }
     
+    /// Cached per-currency formatters — formatValue is called per chart point and
+    /// table row, so allocating a NumberFormatter each call is measurably slow.
+    private static let formatterCache: [Currency: NumberFormatter] = {
+        var cache: [Currency: NumberFormatter] = [:]
+        for currency in Currency.allCases {
+            let formatter = NumberFormatter()
+            formatter.numberStyle = .currency
+            formatter.currencyCode = currency.rawValue
+            formatter.maximumFractionDigits = currency.decimalPlaces
+            formatter.minimumFractionDigits = currency.decimalPlaces
+            cache[currency] = formatter
+        }
+        return cache
+    }()
+
     /// Format a value with the currency symbol and appropriate decimal places
     func formatValue(_ value: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = rawValue
-        formatter.currencySymbol = symbol
-        formatter.maximumFractionDigits = decimalPlaces
-        formatter.minimumFractionDigits = decimalPlaces
-        
+        guard let formatter = Currency.formatterCache[self] else {
+            return "\(symbol)\(value)"
+        }
         return formatter.string(from: NSNumber(value: value)) ?? "\(symbol)\(value)"
     }
 }

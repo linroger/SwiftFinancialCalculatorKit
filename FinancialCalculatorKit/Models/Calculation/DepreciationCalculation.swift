@@ -186,16 +186,26 @@ final class DepreciationCalculation {
         )
     }
     
+    /// Number of years in the depreciation schedule. MACRS schedules extend one year
+    /// past the recovery period because of the half-year convention.
+    var scheduleYearCount: Int {
+        if method == .macrs, let macrsClass = macrsClass {
+            return macrsClass.depreciationRates.count
+        }
+        return max(1, Int(usefulLife.rounded(.up)))
+    }
+
     var isValid: Bool {
         guard !name.isEmpty else { return false }
-        
+
         return assetCost > 0 &&
                salvageValue >= 0 &&
                salvageValue < assetCost &&
                usefulLife > 0 &&
                currentYear > 0 &&
-               currentYear <= usefulLife &&
-               decliningBalanceRate > 0
+               Int(currentYear) <= scheduleYearCount &&
+               decliningBalanceRate > 0 &&
+               (method != .macrs || macrsClass != nil)
     }
     
     var validationErrors: [String] {
@@ -221,8 +231,8 @@ final class DepreciationCalculation {
             errors.append("Useful life must be positive")
         }
         
-        if currentYear <= 0 || currentYear > usefulLife {
-            errors.append("Current year must be between 1 and useful life")
+        if currentYear <= 0 || Int(currentYear) > scheduleYearCount {
+            errors.append("Current year must be between 1 and \(scheduleYearCount)")
         }
         
         if decliningBalanceRate <= 0 {
@@ -239,33 +249,42 @@ final class DepreciationCalculation {
     /// Generate complete depreciation schedule
     func generateDepreciationSchedule() -> [DepreciationEntry] {
         var schedule: [DepreciationEntry] = []
-        let years = Int(usefulLife)
-        
+        let years = scheduleYearCount
+
         switch method {
         case .straightLine:
-            let annualDepreciation = (assetCost - salvageValue) / usefulLife
+            let depreciableBase = assetCost - salvageValue
+            let annualDepreciation = depreciableBase / usefulLife
+            var cumulativeDepreciation = 0.0
             for year in 1...years {
+                // Cap the final (possibly partial) year at the remaining base
+                let depreciation = min(annualDepreciation, depreciableBase - cumulativeDepreciation)
+                cumulativeDepreciation += depreciation
                 schedule.append(DepreciationEntry(
                     year: year,
-                    depreciation: annualDepreciation,
-                    cumulativeDepreciation: annualDepreciation * Double(year),
-                    bookValue: assetCost - (annualDepreciation * Double(year))
+                    depreciation: depreciation,
+                    cumulativeDepreciation: cumulativeDepreciation,
+                    bookValue: assetCost - cumulativeDepreciation
                 ))
             }
-            
+
         case .decliningBalance:
             let rate = decliningBalanceRate / usefulLife
             var bookValue = assetCost
             var cumulativeDepreciation = 0.0
-            
+
             for year in 1...years {
-                let maxDepreciation = bookValue - salvageValue
-                let calculatedDepreciation = bookValue * rate
-                let depreciation = min(calculatedDepreciation, maxDepreciation)
-                
+                let maxDepreciation = max(0, bookValue - salvageValue)
+                let decliningCharge = bookValue * rate
+                // Switch to straight-line on the remaining base once it gives a
+                // larger charge, so the book value reaches salvage at end of life
+                let remainingYears = max(usefulLife - Double(year - 1), 1)
+                let straightLineCharge = maxDepreciation / remainingYears
+                let depreciation = min(max(decliningCharge, straightLineCharge), maxDepreciation)
+
                 cumulativeDepreciation += depreciation
                 bookValue -= depreciation
-                
+
                 schedule.append(DepreciationEntry(
                     year: year,
                     depreciation: depreciation,
@@ -273,17 +292,18 @@ final class DepreciationCalculation {
                     bookValue: bookValue
                 ))
             }
-            
+
         case .sumOfYearsDigits:
             let sumOfYears = (usefulLife * (usefulLife + 1)) / 2
             let depreciableBase = assetCost - salvageValue
             var cumulativeDepreciation = 0.0
-            
+
             for year in 1...years {
-                let remainingLife = usefulLife - Double(year - 1)
-                let depreciation = (remainingLife / sumOfYears) * depreciableBase
+                let remainingLife = max(usefulLife - Double(year - 1), 0)
+                let computed = (remainingLife / sumOfYears) * depreciableBase
+                let depreciation = min(max(computed, 0), depreciableBase - cumulativeDepreciation)
                 cumulativeDepreciation += depreciation
-                
+
                 schedule.append(DepreciationEntry(
                     year: year,
                     depreciation: depreciation,

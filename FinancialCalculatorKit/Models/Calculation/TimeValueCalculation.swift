@@ -129,8 +129,25 @@ final class TimeValueCalculation {
         }
         
         let calculatedValue = calculateSolveForValue()
-        let formattedValue = currency.formatValue(calculatedValue)
-        
+
+        guard calculatedValue.isFinite else {
+            return CalculationResult(
+                primaryValue: 0.0,
+                formattedPrimaryValue: "No solution",
+                explanation: "The target cannot be reached with these inputs. Check that the values describe a solvable scenario."
+            )
+        }
+
+        let formattedValue: String
+        switch solveFor {
+        case .interestRate:
+            formattedValue = String(format: "%.3f%%", calculatedValue)
+        case .numberOfYears:
+            formattedValue = String(format: "%.2f years", calculatedValue)
+        case .presentValue, .futureValue, .payment:
+            formattedValue = currency.formatValue(calculatedValue)
+        }
+
         var secondaryValues: [String: Double] = [:]
         var explanation = ""
         
@@ -186,52 +203,70 @@ final class TimeValueCalculation {
     }
     
     var isValid: Bool {
-        guard !name.isEmpty else { return false }
-        
-        // Check that we have enough inputs to solve
-        let inputCount = [presentValue, futureValue, payment, annualInterestRate, numberOfYears].compactMap { $0 }.count
-        
-        // We need at least 4 out of 5 values to solve for the 5th
-        guard inputCount >= 4 else { return false }
-        
-        // Validate individual inputs
-        if let pv = presentValue, pv < 0 { return false }
-        if let fv = futureValue, fv < 0 { return false }
-        if let rate = annualInterestRate, rate < 0 { return false }
-        if let years = numberOfYears, years <= 0 { return false }
-        
-        return true
+        validationErrors.isEmpty
     }
-    
+
     var validationErrors: [String] {
         var errors: [String] = []
-        
+
         if name.isEmpty {
             errors.append("Name is required")
         }
-        
-        let inputCount = [presentValue, futureValue, payment, annualInterestRate, numberOfYears].compactMap { $0 }.count
-        
-        if inputCount < 4 {
-            errors.append("At least 4 out of 5 values must be provided to solve for the unknown")
+
+        // A missing payment or missing present value is treated as zero, so only
+        // the inputs the chosen solve actually needs are required.
+        let hasMoneyInput = (presentValue ?? 0) != 0 || (payment ?? 0) != 0
+
+        switch solveFor {
+        case .presentValue:
+            if annualInterestRate == nil { errors.append("Interest rate is required") }
+            if numberOfYears == nil { errors.append("Number of years is required") }
+            if (futureValue ?? 0) == 0 && (payment ?? 0) == 0 {
+                errors.append("Provide a future value or a payment amount")
+            }
+        case .futureValue:
+            if annualInterestRate == nil { errors.append("Interest rate is required") }
+            if numberOfYears == nil { errors.append("Number of years is required") }
+            if !hasMoneyInput {
+                errors.append("Provide a present value or a payment amount")
+            }
+        case .payment:
+            if annualInterestRate == nil { errors.append("Interest rate is required") }
+            if numberOfYears == nil { errors.append("Number of years is required") }
+            if (presentValue ?? 0) == 0 && (futureValue ?? 0) == 0 {
+                errors.append("Provide a present value or a future value")
+            }
+        case .interestRate:
+            if numberOfYears == nil { errors.append("Number of years is required") }
+            if (futureValue ?? 0) == 0 {
+                errors.append("A future value target is required to solve for the rate")
+            }
+            if !hasMoneyInput {
+                errors.append("Provide a present value or a payment amount")
+            }
+        case .numberOfYears:
+            if annualInterestRate == nil { errors.append("Interest rate is required") }
+            if (futureValue ?? 0) == 0 {
+                errors.append("A future value target is required to solve for the time")
+            }
+            if !hasMoneyInput {
+                errors.append("Provide a present value or a payment amount")
+            }
         }
-        
+
         if let pv = presentValue, pv < 0 {
             errors.append("Present value cannot be negative")
         }
-        
         if let fv = futureValue, fv < 0 {
             errors.append("Future value cannot be negative")
         }
-        
         if let rate = annualInterestRate, rate < 0 {
             errors.append("Interest rate cannot be negative")
         }
-        
         if let years = numberOfYears, years <= 0 {
             errors.append("Number of years must be positive")
         }
-        
+
         return errors
     }
     
@@ -282,13 +317,15 @@ final class TimeValueCalculation {
     }
     
     private func calculateInterestRate() -> Double {
-        return CalculationEngine.calculateInterestRate(
+        // The engine returns a per-period rate; convert to a nominal annual rate.
+        let periodicRate = CalculationEngine.calculateInterestRate(
             presentValue: presentValue,
             futureValue: futureValue,
             payment: payment,
             numberOfPeriods: paymentFrequency.numberOfPeriods(from: numberOfYears ?? 0.0),
             paymentAtBeginning: paymentsAtBeginning
         )
+        return periodicRate * paymentFrequency.periodsPerYear
     }
     
     private func calculateNumberOfYears() -> Double {
@@ -302,23 +339,38 @@ final class TimeValueCalculation {
         return paymentFrequency.yearsFromPeriods(periods)
     }
     
-    /// Generate cash flow data for visualization
+    /// Generate cash flow data for visualization, including recurring payments.
     private func generateCashFlowData() -> [ChartDataPoint] {
         guard let years = numberOfYears,
               let rate = annualInterestRate else {
             return []
         }
-        
+
+        let totalPeriods = paymentFrequency.numberOfPeriods(from: years)
+        guard totalPeriods.isFinite, totalPeriods > 0 else { return [] }
+
+        // Cap the series so very long horizons stay renderable
+        let periods = min(Int(totalPeriods.rounded()), 1200)
+        let r = paymentFrequency.periodRate(from: rate) / 100
+        let pv = presentValue ?? 0.0
+        let pmt = payment ?? 0.0
+
         var data: [ChartDataPoint] = []
-        let periods = Int(paymentFrequency.numberOfPeriods(from: years))
-        
         for period in 0...periods {
-            let time = paymentFrequency.yearsFromPeriods(Double(period))
-            let value = (presentValue ?? 0.0) * pow(1 + paymentFrequency.periodRate(from: rate) / 100, Double(period))
-            
+            let p = Double(period)
+            let growth = pow(1 + r, p)
+            let annuity: Double
+            if r == 0 {
+                annuity = pmt * p
+            } else {
+                let s = (growth - 1) / r
+                annuity = pmt * (paymentsAtBeginning ? s * (1 + r) : s)
+            }
+            let value = pv * growth + annuity
+            let time = paymentFrequency.yearsFromPeriods(p)
             data.append(ChartDataPoint(x: time, y: value, label: "Period \(period)"))
         }
-        
+
         return data
     }
 }
