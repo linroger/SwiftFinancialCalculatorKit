@@ -493,6 +493,47 @@ struct FinancialCalculatorKitTests {
         #expect(restoredPlan.currency == .gbp)
     }
 
+    @Test @MainActor func unitConversionsPersistAndRestore() async throws {
+        let schema = Schema([UnitConversionCalculation.self])
+        let container = try ModelContainer(
+            for: schema,
+            configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)]
+        )
+        let context = ModelContext(container)
+
+        // 100 °C in °F, the conversion the converter itself computes
+        let converted = try #require(
+            UnitConverterView.convertTemperature(100, from: "°C", to: "°F")
+        )
+        let saved = UnitConversionCalculation(
+            name: "Boiling point",
+            inputValue: 100,
+            outputValue: converted,
+            fromUnit: "°C",
+            toUnit: "°F",
+            category: .temperature
+        )
+        context.insert(saved)
+        try context.save()
+
+        let id = saved.id
+        var descriptor = FetchDescriptor<UnitConversionCalculation>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        let restored = try #require(try context.fetch(descriptor).first)
+
+        #expect(restored.name == "Boiling point")
+        #expect(restored.category == .temperature)
+        #expect(restored.fromUnit == "°C")
+        #expect(restored.toUnit == "°F")
+        #expect(abs(restored.outputValue - 212) < 1e-9)
+        #expect(restored.calculationType == .conversion)
+        #expect(restored.isValid)
+
+        // The stored record describes itself without recomputing
+        #expect(restored.result.formattedPrimaryValue == "212 °F")
+        #expect(restored.result.explanation.contains("100 °C"))
+    }
+
     // MARK: - Command palette
 
     @Test func paletteFindsCalculatorsByNameAndJargon() async throws {

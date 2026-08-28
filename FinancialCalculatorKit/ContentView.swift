@@ -68,6 +68,7 @@ struct SidebarView: View {
     @Query(sort: \CurrencyConversionCalculation.lastModified, order: .reverse) private var currencyCalculations: [CurrencyConversionCalculation]
     @Query(sort: \RetirementPlanCalculation.lastModified, order: .reverse) private var retirementCalculations: [RetirementPlanCalculation]
     @Query(sort: \DebtPayoffCalculation.lastModified, order: .reverse) private var debtPayoffCalculations: [DebtPayoffCalculation]
+    @Query(sort: \UnitConversionCalculation.lastModified, order: .reverse) private var unitCalculations: [UnitConversionCalculation]
 
     // Legacy support
     @Query private var legacyCalculations: [FinancialCalculation]
@@ -253,6 +254,16 @@ struct SidebarView: View {
             ))
         }
 
+        for calc in unitCalculations.prefix(2) {
+            items.append(RecentCalculationItem(
+                id: calc.id,
+                name: calc.name,
+                calculationType: .conversion,
+                lastModified: calc.lastModified,
+                isFavorite: calc.isFavorite
+            ))
+        }
+
         // Filter by search text if needed
         var filtered = items
         if !viewModel.searchText.isEmpty {
@@ -322,7 +333,9 @@ struct SidebarView: View {
                 modelContext.delete(calc)
             }
         case .conversion:
-            break
+            if let calc = unitCalculations.first(where: { $0.id == item.id }) {
+                modelContext.delete(calc)
+            }
         }
         try? modelContext.save()
     }
@@ -351,7 +364,7 @@ struct SidebarView: View {
         case .debtPayoff:
             debtPayoffCalculations.first(where: { $0.id == item.id })?.toggleFavorite()
         case .conversion:
-            break
+            unitCalculations.first(where: { $0.id == item.id })?.toggleFavorite()
         }
         try? modelContext.save()
     }

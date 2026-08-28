@@ -6,11 +6,13 @@
 //
 
 import SwiftUI
+import SwiftData
 
 /// Comprehensive unit converter for international financial calculations
 struct UnitConverterView: View {
+    @Environment(\.modelContext) private var modelContext
     @Environment(MainViewModel.self) private var mainViewModel
-    
+
     @State private var inputValue: Double = 1.0
     @State private var outputValue: Double = 0.0
     @State private var selectedCategory: UnitCategory = .length
@@ -18,6 +20,10 @@ struct UnitConverterView: View {
     @State private var toUnit: String = ""
     @State private var conversionHistory: [ConversionRecord] = []
     @State private var showingHistory: Bool = false
+    @State private var conversionName: String = ""
+    @State private var didSave: Bool = false
+    /// Units to apply after a restore, since changing the category resets them
+    @State private var pendingRestoredUnits: (from: String, to: String)?
     
     var body: some View {
         ScrollView {
@@ -38,9 +44,22 @@ struct UnitConverterView: View {
         .background(Color(NSColor.windowBackgroundColor))
         .onAppear {
             setupInitialUnits()
+            restorePendingCalculation()
+        }
+        .onChange(of: mainViewModel.pendingLoadID) { _, _ in
+            restorePendingCalculation()
         }
         .onChange(of: selectedCategory) { _, _ in
-            setupInitialUnits()
+            // A restore sets the category first; honour its units rather than
+            // resetting to the category defaults
+            if let restored = pendingRestoredUnits {
+                fromUnit = restored.from
+                toUnit = restored.to
+                pendingRestoredUnits = nil
+                performConversion()
+            } else {
+                setupInitialUnits()
+            }
         }
         .sheet(isPresented: $showingHistory) {
             ConversionHistoryView(history: $conversionHistory)
@@ -313,15 +332,26 @@ struct UnitConverterView: View {
             
             // Action buttons
             VStack(spacing: 12) {
-                Button("Add to History") {
+                TextField("Name this conversion to save it", text: $conversionName)
+                    .textFieldStyle(.roundedBorder)
+
+                Button(didSave ? "Saved" : "Save Conversion", systemImage: didSave ? "checkmark" : "square.and.arrow.down") {
+                    persistConversion()
+                }
+                .buttonStyle(.borderedProminent)
+                .frame(maxWidth: .infinity)
+                .disabled(!unitsResolved || conversionName.isEmpty || didSave)
+                .help("Keeps this conversion with your other saved calculations")
+
+                Button("Add to Session History") {
                     saveConversion()
                 }
                 .buttonStyle(.bordered)
                 .frame(maxWidth: .infinity)
                 .disabled(!unitsResolved)
-                .help("Keeps this conversion in the session history (cleared when the app quits)")
-                
-                Button("View History") {
+                .help("Quick scratch list for this session only, cleared when the app quits")
+
+                Button("View Session History") {
                     showingHistory = true
                 }
                 .buttonStyle(.bordered)
@@ -433,6 +463,57 @@ struct UnitConverterView: View {
             timestamp: Date()
         )
         conversionHistory.append(record)
+    }
+
+    /// Persist the conversion alongside every other saved calculation.
+    private func persistConversion() {
+        guard unitsResolved, !conversionName.isEmpty else { return }
+
+        let calculation = UnitConversionCalculation(
+            name: conversionName,
+            inputValue: inputValue,
+            outputValue: outputValue,
+            fromUnit: fromUnit,
+            toUnit: toUnit,
+            category: selectedCategory,
+            currency: mainViewModel.userPreferences.defaultCurrency
+        )
+        calculation.updateTimestamp()
+        modelContext.insert(calculation)
+
+        do {
+            try modelContext.save()
+            didSave = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                didSave = false
+            }
+        } catch {
+            mainViewModel.handleError(.dataExportFailed("Could not save the conversion: \(error.localizedDescription)"))
+        }
+    }
+
+    /// Restore a saved conversion the user opened from the sidebar or dashboard.
+    private func restorePendingCalculation() {
+        guard let id = mainViewModel.takePendingLoadID(for: .conversion) else { return }
+
+        var descriptor = FetchDescriptor<UnitConversionCalculation>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        guard let saved = try? modelContext.fetch(descriptor).first else { return }
+
+        conversionName = saved.name
+        inputValue = saved.inputValue
+        didSave = false
+
+        if saved.category == selectedCategory {
+            // No category change means no onChange, so apply the units directly
+            fromUnit = saved.fromUnit
+            toUnit = saved.toUnit
+            performConversion()
+        } else {
+            // Queue the units for the category's onChange to apply
+            pendingRestoredUnits = (saved.fromUnit, saved.toUnit)
+            selectedCategory = saved.category
+        }
     }
     
     /// Multiplicative conversion factor between the selected units.

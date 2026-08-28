@@ -64,7 +64,30 @@ struct CurrencyConverterView: View {
         .onAppear {
             loadHistory()
             startRefresh()
+            restorePendingCalculation()
         }
+        .onChange(of: mainViewModel.pendingLoadID) { _, _ in
+            restorePendingCalculation()
+        }
+    }
+
+    /// Restore a saved conversion the user opened from the sidebar or dashboard.
+    /// The stored rate is shown as-is, since it is what the conversion was made at.
+    private func restorePendingCalculation() {
+        guard let id = mainViewModel.takePendingLoadID(for: .currency) else { return }
+
+        var descriptor = FetchDescriptor<CurrencyConversionCalculation>(
+            predicate: #Predicate { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        guard let saved = try? modelContext.fetch(descriptor).first else { return }
+
+        amount = saved.sourceAmount
+        fromCurrency = saved.sourceCurrency
+        toCurrency = saved.currency
+        exchangeRate = saved.exchangeRate
+        convertedAmount = saved.sourceAmount * saved.exchangeRate
+        rateStatusMessage = "Showing the rate this conversion was saved at on \(saved.createdDate.formatted(date: .abbreviated, time: .shortened)). Refresh for today's rate."
     }
 
     /// Cancel any in-flight fetch and start a new one for the current base currency.

@@ -24,6 +24,7 @@ struct DashboardView: View {
     @Query(sort: \RetirementPlanCalculation.lastModified, order: .reverse) private var recentRetirement: [RetirementPlanCalculation]
     @Query(sort: \CurrencyConversionCalculation.lastModified, order: .reverse) private var recentCurrency: [CurrencyConversionCalculation]
     @Query(sort: \DebtPayoffCalculation.lastModified, order: .reverse) private var recentDebtPayoff: [DebtPayoffCalculation]
+    @Query(sort: \UnitConversionCalculation.lastModified, order: .reverse) private var recentUnits: [UnitConversionCalculation]
     
     @State private var currentTime = Date()
     let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
@@ -149,7 +150,7 @@ struct DashboardView: View {
     private var totalCalculations: Int {
         recentTVM.count + recentLoans.count + recentInvestments.count + recentOptions.count
             + recentMath.count + recentBonds.count + recentDepreciation.count + recentRetirement.count
-            + recentCurrency.count + recentDebtPayoff.count
+            + recentCurrency.count + recentDebtPayoff.count + recentUnits.count
     }
 
     private var calculationsThisWeek: Int {
@@ -165,6 +166,7 @@ struct DashboardView: View {
         count += recentRetirement.filter { $0.lastModified > weekAgo }.count
         count += recentCurrency.filter { $0.lastModified > weekAgo }.count
         count += recentDebtPayoff.filter { $0.lastModified > weekAgo }.count
+        count += recentUnits.filter { $0.lastModified > weekAgo }.count
         return count
     }
 
@@ -180,6 +182,7 @@ struct DashboardView: View {
         count += recentRetirement.filter { $0.isFavorite }.count
         count += recentCurrency.filter { $0.isFavorite }.count
         count += recentDebtPayoff.filter { $0.isFavorite }.count
+        count += recentUnits.filter { $0.isFavorite }.count
         return count
     }
 
@@ -195,6 +198,7 @@ struct DashboardView: View {
         if !recentRetirement.isEmpty { categories.insert("Retirement") }
         if !recentCurrency.isEmpty { categories.insert("Currency") }
         if !recentDebtPayoff.isEmpty { categories.insert("Debt Payoff") }
+        if !recentUnits.isEmpty { categories.insert("Unit Conversion") }
         return categories.count
     }
     
@@ -420,6 +424,19 @@ struct DashboardView: View {
                 result: item.result.formattedPrimaryValue,
                 icon: "creditcard.trianglebadge.exclamationmark",
                 calculationType: .debtPayoff,
+                calculationId: item.id
+            ))
+        }
+
+        for item in recentUnits.prefix(5) {
+            items.append(ActivityItem(
+                id: item.id,
+                title: item.name,
+                subtitle: "Unit Conversion",
+                date: item.lastModified,
+                result: item.result.formattedPrimaryValue,
+                icon: "arrow.left.arrow.right",
+                calculationType: .conversion,
                 calculationId: item.id
             ))
         }
