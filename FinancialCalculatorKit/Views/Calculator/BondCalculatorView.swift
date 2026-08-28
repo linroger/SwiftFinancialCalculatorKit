@@ -98,7 +98,33 @@ struct BondCalculatorView: View {
         }
         .onAppear {
             currency = mainViewModel.userPreferences.defaultCurrency
+            restorePendingCalculation()
         }
+        .onChange(of: mainViewModel.pendingLoadID) { _, _ in
+            restorePendingCalculation()
+        }
+    }
+
+    /// Restore a saved bond the user opened from the sidebar or dashboard.
+    private func restorePendingCalculation() {
+        guard let id = mainViewModel.takePendingLoadID(for: .bond) else { return }
+
+        var descriptor = FetchDescriptor<BondCalculation>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        guard let saved = try? modelContext.fetch(descriptor).first else { return }
+
+        calculationName = saved.name
+        faceValue = saved.faceValue
+        couponRate = saved.couponRate
+        marketRate = saved.marketRate
+        currentPrice = saved.currentPrice
+        yearsToMaturity = saved.yearsToMaturity
+        paymentsPerYear = saved.paymentsPerYear
+        solveFor = saved.solveFor
+        currency = saved.currency
+
+        calculationResult = saved.result
+        validationErrors = []
     }
     
     @ViewBuilder

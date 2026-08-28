@@ -5,7 +5,7 @@ All notable changes to FinancialCalculatorKit will be documented in this file.
 ## [0.6.0] - 2026-08-28
 
 ### Fixed
-- **Saved calculations can finally be reopened.** Saving worked, but nothing loaded a record back — clicking a saved calculation only switched to the right calculator and discarded its data, making Save a one-way trip. Sidebar rows and dashboard recent-activity entries now restore the full record into the calculator, results included, for Time Value, Loan/Mortgage, Retirement, and Debt Payoff.
+- **Saved calculations can finally be reopened.** Saving worked, but nothing loaded a record back — clicking a saved calculation only switched to the right calculator and discarded its data, making Save a one-way trip. Sidebar rows and dashboard recent-activity entries now restore the full record into the calculator, results included, across all nine calculators that save: Time Value, Loan/Mortgage, Bond, Investment, Options, Depreciation, Math Expression, Retirement, and Debt Payoff.
 
 ### Added
 - **Command palette (⌘K)**: jump to any calculator or action without leaving the keyboard. Matches on name, category, description, and domain jargon — "greeks", "amortization", "macrs", "snowball", "401k", and "ytm" all find the right tool even though none of those words appear in a calculator's name. Multi-word queries narrow the list, title matches rank above description matches, and arrow keys plus Return drive it end to end.

@@ -108,7 +108,33 @@ struct DepreciationCalculatorView: View {
         }
         .onAppear {
             currency = mainViewModel.userPreferences.defaultCurrency
+            restorePendingCalculation()
         }
+        .onChange(of: mainViewModel.pendingLoadID) { _, _ in
+            restorePendingCalculation()
+        }
+    }
+
+    /// Restore a saved schedule the user opened from the sidebar or dashboard.
+    private func restorePendingCalculation() {
+        guard let id = mainViewModel.takePendingLoadID(for: .depreciation) else { return }
+
+        var descriptor = FetchDescriptor<DepreciationCalculation>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        guard let saved = try? modelContext.fetch(descriptor).first else { return }
+
+        calculationName = saved.name
+        assetCost = saved.assetCost
+        salvageValue = saved.salvageValue
+        usefulLife = saved.usefulLife
+        currentYear = saved.currentYear
+        method = saved.method
+        macrsClass = saved.macrsClass
+        decliningBalanceRate = saved.decliningBalanceRate
+        currency = saved.currency
+
+        calculationResult = saved.result
+        validationErrors = []
     }
     
     @ViewBuilder

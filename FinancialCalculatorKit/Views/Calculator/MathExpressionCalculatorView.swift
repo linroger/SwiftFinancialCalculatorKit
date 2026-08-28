@@ -112,7 +112,29 @@ struct MathExpressionCalculatorView: View {
             if variables.isEmpty {
                 variables = defaultVariables
             }
+            restorePendingCalculation()
         }
+        .onChange(of: mainViewModel.pendingLoadID) { _, _ in
+            restorePendingCalculation()
+        }
+    }
+
+    /// Restore a saved expression the user opened from the sidebar or dashboard.
+    private func restorePendingCalculation() {
+        guard let id = mainViewModel.takePendingLoadID(for: .mathExpression) else { return }
+
+        var descriptor = FetchDescriptor<MathExpressionCalculation>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        guard let saved = try? modelContext.fetch(descriptor).first else { return }
+
+        calculationName = saved.name
+        expression = saved.expression
+        variables = saved.variables
+        calculation = saved
+        errorMessage = nil
+
+        // Re-evaluate rather than trusting a stored number
+        evaluateExpression()
     }
     
     @ViewBuilder

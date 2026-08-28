@@ -108,9 +108,33 @@ struct OptionsCalculatorView: View {
         }
         .onAppear {
             currency = mainViewModel.userPreferences.defaultCurrency
-            // Note: Editing existing calculations would be loaded from a query
-            // based on selectedCalculationId if needed
+            restorePendingCalculation()
         }
+        .onChange(of: mainViewModel.pendingLoadID) { _, _ in
+            restorePendingCalculation()
+        }
+    }
+
+    /// Restore a saved option the user opened from the sidebar or dashboard.
+    private func restorePendingCalculation() {
+        guard let id = mainViewModel.takePendingLoadID(for: .options) else { return }
+
+        var descriptor = FetchDescriptor<OptionsCalculation>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        guard let saved = try? modelContext.fetch(descriptor).first else { return }
+
+        calculationName = saved.name
+        spotPrice = saved.spotPrice
+        strikePrice = saved.strikePrice
+        timeToExpiry = saved.timeToExpiry
+        riskFreeRate = saved.riskFreeRate
+        volatility = saved.volatility
+        optionType = saved.optionType
+        currency = saved.currency
+
+        calculation = saved
+        calculationResult = saved.result
+        validationErrors = []
     }
     
     @ViewBuilder
