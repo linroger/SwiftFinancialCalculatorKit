@@ -2,6 +2,13 @@
 
 All notable changes to FinancialCalculatorKit will be documented in this file.
 
+## [0.6.0] - 2026-08-28
+
+### Added
+- **Debt Payoff Planner**, a new calculator: enter several debts and compare avalanche (highest rate first), snowball (smallest balance first), and minimums-only side by side. Every strategy spends the same monthly budget — minimums plus your extra — and rolls each cleared minimum into the next target, so the comparison is honest. Reports months to debt-free, total interest, payoff order with per-debt interest, and a chart of all three balance curves converging on zero. Refuses to pretend when a budget cannot outpace the accruing interest, and says how much more per month is needed.
+- Saved debt plans persist through SwiftData (debts stored as JSON, no value transformer needed) and appear in the sidebar, dashboard statistics, and recent activity like every other calculation
+- 9 tests for the payoff engine, including a conservation check that total paid equals principal plus accrued interest for every strategy
+
 ## [0.5.0] - 2026-08-28
 
 ### Added

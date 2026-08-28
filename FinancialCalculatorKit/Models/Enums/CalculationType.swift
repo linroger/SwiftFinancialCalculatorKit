@@ -12,6 +12,7 @@ enum CalculationType: String, CaseIterable, Identifiable {
     case timeValue = "timeValue"
     case loan = "loan"
     case mortgage = "mortgage"
+    case debtPayoff = "debtPayoff"
     case retirement = "retirement"
     case bond = "bond"
     case investment = "investment"
@@ -31,6 +32,8 @@ enum CalculationType: String, CaseIterable, Identifiable {
             return "Loan Calculator"
         case .mortgage:
             return "Mortgage Calculator"
+        case .debtPayoff:
+            return "Debt Payoff Planner"
         case .retirement:
             return "Retirement Planner"
         case .bond:
@@ -58,6 +61,8 @@ enum CalculationType: String, CaseIterable, Identifiable {
             return "Analyze loan payments, interest, and amortization schedules"
         case .mortgage:
             return "Calculate mortgage payments, total interest, and payment schedules"
+        case .debtPayoff:
+            return "Compare avalanche, snowball, and minimum-only strategies across several debts"
         case .retirement:
             return "Project savings to retirement, required nest egg, and sustainable income"
         case .bond:
@@ -85,6 +90,8 @@ enum CalculationType: String, CaseIterable, Identifiable {
             return "creditcard"
         case .mortgage:
             return "house"
+        case .debtPayoff:
+            return "creditcard.trianglebadge.exclamationmark"
         case .retirement:
             return "figure.walk.motion"
         case .bond:
@@ -106,7 +113,7 @@ enum CalculationType: String, CaseIterable, Identifiable {
 
     var category: CalculationCategory {
         switch self {
-        case .timeValue, .loan, .mortgage, .retirement, .depreciation:
+        case .timeValue, .loan, .mortgage, .debtPayoff, .retirement, .depreciation:
             return .basics
         case .bond, .investment, .options:
             return .investment

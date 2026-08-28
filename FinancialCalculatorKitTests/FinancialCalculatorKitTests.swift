@@ -408,6 +408,145 @@ struct FinancialCalculatorKitTests {
         #expect(abs(rebalanced.surplus) < 1.0)
     }
 
+    // MARK: - Debt payoff strategies
+
+    /// Three debts whose rate order and balance order deliberately disagree,
+    /// so avalanche and snowball genuinely diverge.
+    private var sampleDebts: [Debt] {
+        [
+            Debt(name: "Credit Card", balance: 8_500, annualRate: 22.9, minimumPayment: 210),
+            Debt(name: "Car Loan", balance: 3_200, annualRate: 6.4, minimumPayment: 320),
+            Debt(name: "Student Loan", balance: 21_000, annualRate: 4.5, minimumPayment: 240)
+        ]
+    }
+
+    @Test func avalancheNeverCostsMoreInterestThanSnowball() async throws {
+        let avalanche = try DebtPayoffPlanner.plan(debts: sampleDebts, extraPayment: 200, strategy: .avalanche)
+        let snowball = try DebtPayoffPlanner.plan(debts: sampleDebts, extraPayment: 200, strategy: .snowball)
+
+        #expect(avalanche.totalInterest <= snowball.totalInterest)
+        #expect(avalanche.months <= snowball.months)
+        // Both spend the same budget, which is what makes the comparison fair
+        #expect(avalanche.monthlyBudget == snowball.monthlyBudget)
+    }
+
+    @Test func strategiesTargetTheDebtTheyClaimTo() async throws {
+        let avalanche = try DebtPayoffPlanner.plan(debts: sampleDebts, extraPayment: 200, strategy: .avalanche)
+        let snowball = try DebtPayoffPlanner.plan(debts: sampleDebts, extraPayment: 200, strategy: .snowball)
+
+        func month(_ plan: DebtPayoffPlan, _ name: String) throws -> Int {
+            try #require(plan.milestones.first { $0.debtName == name }).month
+        }
+        func interest(_ plan: DebtPayoffPlan, _ name: String) throws -> Double {
+            try #require(plan.milestones.first { $0.debtName == name }).interestPaid
+        }
+
+        // Note the order debts *retire* is not the order they are *targeted*:
+        // the small Car Loan clears first under both strategies simply because
+        // its own minimum outruns a 3,200 balance. What distinguishes the
+        // strategies is which debt the surplus accelerates.
+
+        // Avalanche accelerates the 22.9% card, so it clears sooner and cheaper
+        #expect(try month(avalanche, "Credit Card") <= month(snowball, "Credit Card"))
+        #expect(try interest(avalanche, "Credit Card") < interest(snowball, "Credit Card"))
+
+        // Snowball accelerates the smallest balance, so it never clears later
+        #expect(try month(snowball, "Car Loan") <= month(avalanche, "Car Loan"))
+
+        // Every debt is eventually retired under both
+        #expect(avalanche.milestones.count == 3)
+        #expect(snowball.milestones.count == 3)
+    }
+
+    @Test func rolloverAndExtraPaymentBeatMinimumsOnly() async throws {
+        let minimums = try DebtPayoffPlanner.plan(debts: sampleDebts, extraPayment: 0, strategy: .minimumsOnly)
+        let avalanche = try DebtPayoffPlanner.plan(debts: sampleDebts, extraPayment: 200, strategy: .avalanche)
+
+        #expect(avalanche.months < minimums.months)
+        #expect(avalanche.totalInterest < minimums.totalInterest)
+        // Minimums-only spends exactly the minimums, with nothing rolled over
+        #expect(abs(minimums.monthlyBudget - 770) < 1e-9)
+    }
+
+    @Test func everyStrategyRepaysThePrincipalExactly() async throws {
+        let startingBalance = sampleDebts.reduce(0) { $0 + $1.balance }
+
+        for strategy in PayoffStrategy.allCases {
+            let plan = try DebtPayoffPlanner.plan(debts: sampleDebts, extraPayment: 150, strategy: strategy)
+            // Total paid must equal principal plus the interest that accrued
+            #expect(abs(plan.totalPaid - (startingBalance + plan.totalInterest)) < 0.05)
+            // And the balance timeline must actually reach zero
+            #expect((plan.balanceTimeline.last?.totalBalance ?? 1) < 0.01)
+        }
+    }
+
+    @Test func extraPaymentMonotonicallyShortensThePlan() async throws {
+        let none = try DebtPayoffPlanner.plan(debts: sampleDebts, extraPayment: 0, strategy: .avalanche)
+        let some = try DebtPayoffPlanner.plan(debts: sampleDebts, extraPayment: 250, strategy: .avalanche)
+        let lots = try DebtPayoffPlanner.plan(debts: sampleDebts, extraPayment: 1_000, strategy: .avalanche)
+
+        #expect(some.months < none.months)
+        #expect(lots.months < some.months)
+        #expect(lots.totalInterest < some.totalInterest)
+        #expect(some.totalInterest < none.totalInterest)
+    }
+
+    @Test func aBudgetBelowTheAccruingInterestIsRejected() async throws {
+        // 25% on 10,000 accrues ~208/month; a 50/month minimum cannot keep up
+        let hopeless = [Debt(name: "Card", balance: 10_000, annualRate: 25, minimumPayment: 50)]
+
+        #expect(throws: DebtPayoffError.self) {
+            try DebtPayoffPlanner.plan(debts: hopeless, extraPayment: 0, strategy: .avalanche)
+        }
+
+        // Enough extra to outpace the interest makes it solvable again
+        let plan = try DebtPayoffPlanner.plan(debts: hopeless, extraPayment: 400, strategy: .avalanche)
+        #expect(plan.months > 0)
+    }
+
+    @Test func emptyDebtListIsRejected() async throws {
+        #expect(throws: DebtPayoffError.self) {
+            try DebtPayoffPlanner.plan(debts: [], extraPayment: 100, strategy: .avalanche)
+        }
+        // Zero balances count as nothing to pay off
+        #expect(throws: DebtPayoffError.self) {
+            try DebtPayoffPlanner.plan(
+                debts: [Debt(name: "Paid", balance: 0, annualRate: 5, minimumPayment: 50)],
+                extraPayment: 100,
+                strategy: .avalanche
+            )
+        }
+    }
+
+    @Test func interestFreeDebtsRetireOnScheduleWithNoInterest() async throws {
+        let debts = [
+            Debt(name: "Family Loan", balance: 1_200, annualRate: 0, minimumPayment: 100),
+            Debt(name: "Buy Now Pay Later", balance: 600, annualRate: 0, minimumPayment: 100)
+        ]
+        let plan = try DebtPayoffPlanner.plan(debts: debts, extraPayment: 0, strategy: .avalanche)
+
+        #expect(plan.totalInterest < 1e-9)
+        // 1,800 owed at 200/month clears in 9 months
+        #expect(plan.months == 9)
+        #expect(abs(plan.totalPaid - 1_800) < 0.01)
+    }
+
+    @Test func debtPayoffModelRoundTripsDebtsAndReportsAResult() async throws {
+        let calculation = DebtPayoffCalculation(
+            name: "Plan", debts: sampleDebts, extraPayment: 200, strategy: .avalanche
+        )
+
+        // Debts survive the JSON round-trip through the stored property
+        #expect(calculation.debts.count == 3)
+        #expect(calculation.debts.first?.name == "Credit Card")
+        #expect(calculation.isValid)
+
+        let result = calculation.result
+        #expect(result.primaryValue > 0)
+        #expect((result.secondaryValues["Total Interest"] ?? 0) > 0)
+        #expect(result.chartData?.isEmpty == false)
+    }
+
     // MARK: - Refinance analysis
 
     @Test func refinancePaymentAgreesWithTheLoanModel() async throws {

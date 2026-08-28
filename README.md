@@ -17,7 +17,8 @@ A comprehensive, feature-rich financial calculator app for macOS built with Swif
 | **Time Value of Money (TVM)** | Present Value (PV), Future Value (FV), Payment (PMT), Interest Rate (I/Y), Number of Periods (N), Annuity calculations |
 | **Loan Calculator** | Monthly payment, amortization schedules, total interest, extra payment scenarios, refinancing analysis |
 | **Mortgage Calculator** | Home loan analysis, down payment scenarios, PMI calculation, payment schedules |
-| **Retirement Planner** | Nest-egg projection, required-savings gap analysis, sustainable income, depletion-age simulation |
+| **Debt Payoff Planner** | Multi-debt avalanche vs snowball vs minimums-only comparison, payoff order, interest saved, balance timeline |
+| **Retirement Planner** | Nest-egg projection, required-savings gap analysis, sustainable income, depletion-age simulation, Monte Carlo probability of success |
 | **Bond Calculator** | Bond pricing, Yield to Maturity (YTM), duration, convexity, sensitivity analysis, cash flow schedules |
 | **Investment Analysis** | Net Present Value (NPV), Internal Rate of Return (IRR), Modified IRR (MIRR), payback period, profitability index |
 | **Options Calculator** | Black-Scholes pricing, Greeks analysis (Delta, Gamma, Theta, Vega), risk assessment |
@@ -169,7 +170,8 @@ Copyright © 2025 Roger Lin. All rights reserved.
 | **货币时间价值 (TVM)** | 现值 (PV)、终值 (FV)、每期付款 (PMT)、利率 (I/Y)、期数 (N)、年金计算 |
 | **贷款计算器** | 月供计算、摊销计划表、利息总额、额外还款方案、再融资分析 |
 | **抵押贷款计算器** | 房贷分析、首付方案、PMI 计算、还款计划表 |
-| **退休规划** | 退休储蓄预测、所需储蓄缺口分析、可持续收入、资金耗尽年龄模拟 |
+| **债务清偿规划** | 多笔债务的雪崩法、雪球法与仅还最低还款额对比、清偿顺序、利息节省、余额时间线 |
+| **退休规划** | 退休储蓄预测、所需储蓄缺口分析、可持续收入、资金耗尽年龄模拟、蒙特卡洛成功概率 |
 | **债券计算器** | 债券定价、到期收益率 (YTM)、久期、凸性、敏感性分析、现金流表 |
 | **投资分析** | 净现值 (NPV)、内部收益率 (IRR)、改进内部收益率 (MIRR)、回收期、获利指数 |
 | **期权计算器** | 布莱克-舒尔斯定价、希腊值分析（Delta、Gamma、Theta、Vega）、风险评估 |

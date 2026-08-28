@@ -23,6 +23,7 @@ struct DashboardView: View {
     @Query(sort: \DepreciationCalculation.lastModified, order: .reverse) private var recentDepreciation: [DepreciationCalculation]
     @Query(sort: \RetirementPlanCalculation.lastModified, order: .reverse) private var recentRetirement: [RetirementPlanCalculation]
     @Query(sort: \CurrencyConversionCalculation.lastModified, order: .reverse) private var recentCurrency: [CurrencyConversionCalculation]
+    @Query(sort: \DebtPayoffCalculation.lastModified, order: .reverse) private var recentDebtPayoff: [DebtPayoffCalculation]
     
     @State private var currentTime = Date()
     let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
@@ -148,7 +149,7 @@ struct DashboardView: View {
     private var totalCalculations: Int {
         recentTVM.count + recentLoans.count + recentInvestments.count + recentOptions.count
             + recentMath.count + recentBonds.count + recentDepreciation.count + recentRetirement.count
-            + recentCurrency.count
+            + recentCurrency.count + recentDebtPayoff.count
     }
 
     private var calculationsThisWeek: Int {
@@ -163,6 +164,7 @@ struct DashboardView: View {
         count += recentDepreciation.filter { $0.lastModified > weekAgo }.count
         count += recentRetirement.filter { $0.lastModified > weekAgo }.count
         count += recentCurrency.filter { $0.lastModified > weekAgo }.count
+        count += recentDebtPayoff.filter { $0.lastModified > weekAgo }.count
         return count
     }
 
@@ -177,6 +179,7 @@ struct DashboardView: View {
         count += recentDepreciation.filter { $0.isFavorite }.count
         count += recentRetirement.filter { $0.isFavorite }.count
         count += recentCurrency.filter { $0.isFavorite }.count
+        count += recentDebtPayoff.filter { $0.isFavorite }.count
         return count
     }
 
@@ -191,6 +194,7 @@ struct DashboardView: View {
         if !recentDepreciation.isEmpty { categories.insert("Depreciation") }
         if !recentRetirement.isEmpty { categories.insert("Retirement") }
         if !recentCurrency.isEmpty { categories.insert("Currency") }
+        if !recentDebtPayoff.isEmpty { categories.insert("Debt Payoff") }
         return categories.count
     }
     
@@ -400,6 +404,19 @@ struct DashboardView: View {
                 result: item.result.formattedPrimaryValue,
                 icon: "figure.walk.motion",
                 calculationType: .retirement,
+                calculationId: item.id
+            ))
+        }
+
+        for item in recentDebtPayoff.prefix(5) {
+            items.append(ActivityItem(
+                id: item.id,
+                title: item.name,
+                subtitle: "Debt Payoff Plan",
+                date: item.lastModified,
+                result: item.result.formattedPrimaryValue,
+                icon: "creditcard.trianglebadge.exclamationmark",
+                calculationType: .debtPayoff,
                 calculationId: item.id
             ))
         }

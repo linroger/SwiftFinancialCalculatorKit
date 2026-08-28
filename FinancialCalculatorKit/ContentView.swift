@@ -64,6 +64,7 @@ struct SidebarView: View {
     @Query(sort: \DepreciationCalculation.lastModified, order: .reverse) private var depreciationCalculations: [DepreciationCalculation]
     @Query(sort: \CurrencyConversionCalculation.lastModified, order: .reverse) private var currencyCalculations: [CurrencyConversionCalculation]
     @Query(sort: \RetirementPlanCalculation.lastModified, order: .reverse) private var retirementCalculations: [RetirementPlanCalculation]
+    @Query(sort: \DebtPayoffCalculation.lastModified, order: .reverse) private var debtPayoffCalculations: [DebtPayoffCalculation]
 
     // Legacy support
     @Query private var legacyCalculations: [FinancialCalculation]
@@ -239,6 +240,16 @@ struct SidebarView: View {
             ))
         }
 
+        for calc in debtPayoffCalculations.prefix(3) {
+            items.append(RecentCalculationItem(
+                id: calc.id,
+                name: calc.name,
+                calculationType: .debtPayoff,
+                lastModified: calc.lastModified,
+                isFavorite: calc.isFavorite
+            ))
+        }
+
         // Filter by search text if needed
         var filtered = items
         if !viewModel.searchText.isEmpty {
@@ -303,6 +314,10 @@ struct SidebarView: View {
             if let calc = retirementCalculations.first(where: { $0.id == item.id }) {
                 modelContext.delete(calc)
             }
+        case .debtPayoff:
+            if let calc = debtPayoffCalculations.first(where: { $0.id == item.id }) {
+                modelContext.delete(calc)
+            }
         case .conversion:
             break
         }
@@ -330,6 +345,8 @@ struct SidebarView: View {
             currencyCalculations.first(where: { $0.id == item.id })?.toggleFavorite()
         case .retirement:
             retirementCalculations.first(where: { $0.id == item.id })?.toggleFavorite()
+        case .debtPayoff:
+            debtPayoffCalculations.first(where: { $0.id == item.id })?.toggleFavorite()
         case .conversion:
             break
         }
@@ -401,6 +418,8 @@ struct DetailView: View {
                     TimeValueCalculatorView()
                 case .loan, .mortgage:
                     LoanCalculatorView()
+                case .debtPayoff:
+                    DebtPayoffCalculatorView()
                 case .retirement:
                     RetirementPlannerView()
                 case .bond:
