@@ -30,6 +30,9 @@ struct ContentView: View {
                 PreferencesView(viewModel: viewModel)
             case .help:
                 HelpView()
+            case .commandPalette:
+                CommandPaletteView()
+                    .environment(viewModel)
             }
         }
         .alert("Error", isPresented: $viewModel.showingError) {
@@ -880,6 +883,7 @@ struct FeatureCard: View {
 
 struct ShortcutsHelpContent: View {
     let shortcuts = [
+        ("⌘ K", "Quick Open — jump to any calculator"),
         ("⌘ N", "New Calculation"),
         ("⌘ 0", "Go to Dashboard"),
         ("⌘ 1–9", "Jump to a calculator (Calculators menu)"),

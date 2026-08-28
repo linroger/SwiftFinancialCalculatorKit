@@ -82,6 +82,11 @@ struct CalculatorCommands: Commands {
         }
 
         CommandMenu("Calculators") {
+            Button("Quick Open…") {
+                viewModel.showCommandPalette()
+            }
+            .keyboardShortcut("k", modifiers: .command)
+
             Button("Dashboard") {
                 viewModel.showDashboard()
             }

@@ -408,6 +408,69 @@ struct FinancialCalculatorKitTests {
         #expect(abs(rebalanced.surplus) < 1.0)
     }
 
+    // MARK: - Command palette
+
+    @Test func paletteFindsCalculatorsByNameAndJargon() async throws {
+        let commands = PaletteCommand.calculatorCommands()
+
+        func titles(_ query: String) -> [String] {
+            PaletteCommand.matching(query, in: commands).map(\.title)
+        }
+
+        // Direct name match ranks first
+        #expect(titles("bond").first == "Bond Calculator")
+
+        // Domain jargon that appears in no calculator name still finds the tool
+        #expect(titles("greeks").contains("Options Calculator"))
+        #expect(titles("amortization").contains("Loan Calculator"))
+        #expect(titles("macrs").contains("Depreciation"))
+        #expect(titles("snowball").contains("Debt Payoff Planner"))
+        #expect(titles("401k").contains("Retirement Planner"))
+        #expect(titles("ytm").contains("Bond Calculator"))
+        #expect(titles("irr").contains("Investment Analysis"))
+
+        // Case is ignored
+        #expect(titles("GREEKS").contains("Options Calculator"))
+    }
+
+    @Test func paletteNarrowsAsTermsAreAdded() async throws {
+        let commands = PaletteCommand.calculatorCommands()
+
+        let broad = PaletteCommand.matching("calculator", in: commands).count
+        let narrow = PaletteCommand.matching("bond calculator", in: commands).count
+
+        #expect(narrow < broad)
+        #expect(narrow >= 1)
+
+        // Terms may match across different fields — "rate" is a keyword, "bond" a title
+        #expect(PaletteCommand.matching("bond yield", in: commands).count == 1)
+    }
+
+    @Test func paletteReturnsEverythingForAnEmptyQuery() async throws {
+        let commands = PaletteCommand.calculatorCommands()
+
+        #expect(PaletteCommand.matching("", in: commands).count == commands.count)
+        #expect(PaletteCommand.matching("   ", in: commands).count == commands.count)
+        // Every calculator type is reachable from the palette
+        #expect(commands.count == CalculationType.allCases.count)
+    }
+
+    @Test func paletteReturnsNothingForAnUnmatchedQuery() async throws {
+        let commands = PaletteCommand.calculatorCommands()
+        #expect(PaletteCommand.matching("zzzz-not-a-thing", in: commands).isEmpty)
+    }
+
+    @Test func paletteRanksTitlePrefixMatchesAboveKeywordMatches() async throws {
+        let commands = PaletteCommand.calculatorCommands()
+        let results = PaletteCommand.matching("loan", in: commands)
+
+        // "Loan Calculator" starts with the term, so it outranks the
+        // Mortgage and Debt Payoff entries that merely mention loans
+        #expect(results.first?.title == "Loan Calculator")
+        #expect(results.contains { $0.title == "Mortgage Calculator" })
+        #expect(results.contains { $0.title == "Debt Payoff Planner" })
+    }
+
     // MARK: - Debt payoff strategies
 
     /// Three debts whose rate order and balance order deliberately disagree,

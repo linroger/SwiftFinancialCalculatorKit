@@ -16,6 +16,7 @@ class MainViewModel {
         case calculatorPicker
         case preferences
         case help
+        case commandPalette
 
         var id: String { rawValue }
     }
@@ -91,6 +92,11 @@ class MainViewModel {
     /// Open the help sheet.
     func showHelp() {
         presentedSheet = .help
+    }
+
+    /// Open the ⌘K command palette.
+    func showCommandPalette() {
+        presentedSheet = .commandPalette
     }
 
     /// Dismiss any active sheet.

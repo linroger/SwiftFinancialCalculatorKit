@@ -5,6 +5,7 @@ All notable changes to FinancialCalculatorKit will be documented in this file.
 ## [0.6.0] - 2026-08-28
 
 ### Added
+- **Command palette (⌘K)**: jump to any calculator or action without leaving the keyboard. Matches on name, category, description, and domain jargon — "greeks", "amortization", "macrs", "snowball", "401k", and "ytm" all find the right tool even though none of those words appear in a calculator's name. Multi-word queries narrow the list, title matches rank above description matches, and arrow keys plus Return drive it end to end.
 - **Debt Payoff Planner**, a new calculator: enter several debts and compare avalanche (highest rate first), snowball (smallest balance first), and minimums-only side by side. Every strategy spends the same monthly budget — minimums plus your extra — and rolls each cleared minimum into the next target, so the comparison is honest. Reports months to debt-free, total interest, payoff order with per-debt interest, and a chart of all three balance curves converging on zero. Refuses to pretend when a budget cannot outpace the accruing interest, and says how much more per month is needed.
 - Saved debt plans persist through SwiftData (debts stored as JSON, no value transformer needed) and appear in the sidebar, dashboard statistics, and recent activity like every other calculation
 - 9 tests for the payoff engine, including a conservation check that total paid equals principal plus accrued interest for every strategy
