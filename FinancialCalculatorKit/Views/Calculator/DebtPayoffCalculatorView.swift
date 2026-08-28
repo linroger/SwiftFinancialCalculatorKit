@@ -82,9 +82,13 @@ struct DebtPayoffCalculatorView: View {
         }
         .onAppear {
             currency = mainViewModel.userPreferences.defaultCurrency
+            restorePendingCalculation()
             if debts.isEmpty {
                 loadExample()
             }
+        }
+        .onChange(of: mainViewModel.pendingLoadID) { _, _ in
+            restorePendingCalculation()
         }
         .onChange(of: extraPayment) { _, _ in clearResults() }
         .onChange(of: currency) { _, _ in clearResults() }
@@ -426,6 +430,26 @@ struct DebtPayoffCalculatorView: View {
         plans = []
         planError = nil
         didSave = false
+    }
+
+    /// Restore a saved plan the user opened from the sidebar or dashboard.
+    private func restorePendingCalculation() {
+        guard let id = mainViewModel.takePendingLoadID(for: .debtPayoff) else { return }
+
+        var descriptor = FetchDescriptor<DebtPayoffCalculation>(
+            predicate: #Predicate { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        guard let saved = try? modelContext.fetch(descriptor).first else { return }
+
+        calculationName = saved.name
+        debts = saved.debts
+        extraPayment = saved.extraPayment
+        currency = saved.currency
+
+        planError = nil
+        didSave = false
+        recalculate()
     }
 
     private func loadExample() {

@@ -408,6 +408,91 @@ struct FinancialCalculatorKitTests {
         #expect(abs(rebalanced.surplus) < 1.0)
     }
 
+    // MARK: - Restoring saved calculations
+
+    @Test func openingASavedCalculationHandsTheIDToTheRightCalculator() async throws {
+        let viewModel = MainViewModel()
+        let id = UUID()
+
+        viewModel.openSavedCalculation(id: id, type: .loan)
+        #expect(viewModel.selectedCalculationType == .loan)
+
+        // A calculator that does not own the selection must not consume it
+        #expect(viewModel.takePendingLoadID(for: .bond) == nil)
+        #expect(viewModel.pendingLoadID == id)
+
+        // The owning calculator gets it exactly once
+        #expect(viewModel.takePendingLoadID(for: .loan, .mortgage) == id)
+        #expect(viewModel.takePendingLoadID(for: .loan, .mortgage) == nil)
+        #expect(viewModel.pendingLoadID == nil)
+    }
+
+    @Test func openingABlankCalculatorClearsAnyPendingLoad() async throws {
+        let viewModel = MainViewModel()
+        viewModel.openSavedCalculation(id: UUID(), type: .loan)
+
+        // Navigating to a fresh calculator must not drag the old record along
+        viewModel.openCalculator(.loan)
+        #expect(viewModel.pendingLoadID == nil)
+        #expect(viewModel.takePendingLoadID(for: .loan) == nil)
+    }
+
+    @Test @MainActor func savedCalculationsFetchBackByIDWithEveryFieldIntact() async throws {
+        let schema = Schema([
+            FinancialCalculation.self, TimeValueCalculation.self, LoanCalculation.self,
+            BondCalculation.self, InvestmentCalculation.self, DepreciationCalculation.self,
+            OptionsCalculation.self, MathExpressionCalculation.self,
+            CurrencyConversionCalculation.self, RetirementPlanCalculation.self,
+            DebtPayoffCalculation.self
+        ])
+        let container = try ModelContainer(
+            for: schema,
+            configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)]
+        )
+        let context = ModelContext(container)
+
+        let loan = LoanCalculation(
+            name: "Restored Mortgage", principalAmount: 420_000,
+            annualInterestRate: 5.75, loanTermYears: 30,
+            paymentFrequency: .monthly, downPayment: 84_000,
+            extraPayment: 150, loanType: .mortgage, currency: .eur
+        )
+        context.insert(loan)
+
+        let plan = DebtPayoffCalculation(
+            name: "Restored Debts", debts: sampleDebts, extraPayment: 275, currency: .gbp
+        )
+        context.insert(plan)
+        try context.save()
+
+        // The same fetch the calculator views perform on restore
+        let loanID = loan.id
+        var loanDescriptor = FetchDescriptor<LoanCalculation>(predicate: #Predicate { $0.id == loanID })
+        loanDescriptor.fetchLimit = 1
+        let restoredLoan = try #require(try context.fetch(loanDescriptor).first)
+
+        #expect(restoredLoan.name == "Restored Mortgage")
+        #expect(restoredLoan.principalAmount == 420_000)
+        #expect(restoredLoan.annualInterestRate == 5.75)
+        #expect(restoredLoan.loanTermYears == 30)
+        #expect(restoredLoan.downPayment == 84_000)
+        #expect(restoredLoan.extraPayment == 150)
+        #expect(restoredLoan.loanType == .mortgage)
+        #expect(restoredLoan.currency == .eur)
+        // The restored record must reproduce its own result
+        #expect(restoredLoan.result.primaryValue > 0)
+
+        let planID = plan.id
+        var planDescriptor = FetchDescriptor<DebtPayoffCalculation>(predicate: #Predicate { $0.id == planID })
+        planDescriptor.fetchLimit = 1
+        let restoredPlan = try #require(try context.fetch(planDescriptor).first)
+
+        #expect(restoredPlan.debts.count == 3)
+        #expect(restoredPlan.debts.first?.name == "Credit Card")
+        #expect(restoredPlan.extraPayment == 275)
+        #expect(restoredPlan.currency == .gbp)
+    }
+
     // MARK: - Command palette
 
     @Test func paletteFindsCalculatorsByNameAndJargon() async throws {

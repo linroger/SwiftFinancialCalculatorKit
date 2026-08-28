@@ -77,7 +77,38 @@ struct RetirementPlannerView: View {
         }
         .onAppear {
             currency = mainViewModel.userPreferences.defaultCurrency
+            restorePendingCalculation()
         }
+        .onChange(of: mainViewModel.pendingLoadID) { _, _ in
+            restorePendingCalculation()
+        }
+    }
+
+    /// Restore a saved plan the user opened from the sidebar or dashboard.
+    private func restorePendingCalculation() {
+        guard let id = mainViewModel.takePendingLoadID(for: .retirement) else { return }
+
+        var descriptor = FetchDescriptor<RetirementPlanCalculation>(
+            predicate: #Predicate { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        guard let saved = try? modelContext.fetch(descriptor).first else { return }
+
+        calculationName = saved.name
+        currentAge = saved.currentAge
+        retirementAge = saved.retirementAge
+        lifeExpectancy = saved.lifeExpectancy
+        currentSavings = saved.currentSavings
+        monthlyContribution = saved.monthlyContribution
+        preRetirementReturn = saved.preRetirementReturn
+        inRetirementReturn = saved.inRetirementReturn
+        inflationRate = saved.inflationRate
+        desiredMonthlyIncome = saved.desiredMonthlyIncome
+        currency = saved.currency
+
+        validationErrors = []
+        didSave = false
+        performCalculation()
     }
 
     /// Snapshot of the current inputs for the stochastic analysis.

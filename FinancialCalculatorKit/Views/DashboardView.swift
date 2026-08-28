@@ -282,7 +282,10 @@ struct DashboardView: View {
                 LazyVStack(spacing: 12) {
                     ForEach(recentActivity) { activity in
                         Button(action: {
-                            mainViewModel.openCalculator(activity.calculationType)
+                            mainViewModel.openSavedCalculation(
+                                id: activity.calculationId,
+                                type: activity.calculationType
+                            )
                         }) {
                             RecentActivityRow(
                                 icon: activity.icon,

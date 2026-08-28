@@ -396,17 +396,20 @@ struct RecentCalculationRowView: View {
             
             Spacer()
             
-            Button(action: { viewModel.openCalculator(item.calculationType) }) {
+            Button(action: open) {
                 Image(systemName: "arrow.right.circle")
                     .font(.caption)
             }
             .buttonStyle(.plain)
-            .help("Open calculator")
+            .help("Open this saved calculation")
+            .accessibilityLabel("Open \(item.name)")
         }
         .contentShape(Rectangle())
-        .onTapGesture {
-            viewModel.openCalculator(item.calculationType)
-        }
+        .onTapGesture(perform: open)
+    }
+
+    private func open() {
+        viewModel.openSavedCalculation(id: item.id, type: item.calculationType)
     }
 }
 

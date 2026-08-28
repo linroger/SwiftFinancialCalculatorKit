@@ -82,6 +82,10 @@ struct TimeValueCalculatorView: View {
         }
         .onAppear {
             loadUserPreferences()
+            restorePendingCalculation()
+        }
+        .onChange(of: mainViewModel.pendingLoadID) { _, _ in
+            restorePendingCalculation()
         }
         .onChange(of: presentValue) { clearResults() }
         .onChange(of: futureValue) { clearResults() }
@@ -533,6 +537,34 @@ struct TimeValueCalculatorView: View {
     private func loadUserPreferences() {
         currency = mainViewModel.userPreferences.defaultCurrency
         paymentFrequency = mainViewModel.userPreferences.defaultPaymentFrequency
+    }
+
+    /// Restore a saved plan the user opened from the sidebar or dashboard.
+    private func restorePendingCalculation() {
+        guard let id = mainViewModel.takePendingLoadID(for: .timeValue) else { return }
+
+        var descriptor = FetchDescriptor<TimeValueCalculation>(
+            predicate: #Predicate { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        guard let saved = try? modelContext.fetch(descriptor).first else { return }
+
+        calculationName = saved.name
+        presentValue = saved.presentValue
+        futureValue = saved.futureValue
+        payment = saved.payment
+        interestRate = saved.annualInterestRate
+        numberOfYears = saved.numberOfYears
+        numberOfYearsText = saved.numberOfYears.map { String(format: "%g", $0) } ?? ""
+        paymentFrequency = saved.paymentFrequency
+        paymentsAtBeginning = saved.paymentsAtBeginning
+        solveFor = saved.solveFor
+        currency = saved.currency
+
+        calculation = saved
+        calculationResult = saved.result
+        validationErrors = []
+        didSave = false
     }
 
     private func generateInsights(snapshot: TVMAnalysisSnapshot, result: CalculationResult) -> [String] {

@@ -99,6 +99,10 @@ struct LoanCalculatorView: View {
         }
         .onAppear {
             loadUserPreferences()
+            restorePendingCalculation()
+        }
+        .onChange(of: mainViewModel.pendingLoadID) { _, _ in
+            restorePendingCalculation()
         }
         .onChange(of: principalAmount) { clearResults() }
         .onChange(of: annualInterestRate) { clearResults() }
@@ -459,6 +463,34 @@ struct LoanCalculatorView: View {
     private func loadUserPreferences() {
         currency = mainViewModel.userPreferences.defaultCurrency
         paymentFrequency = mainViewModel.userPreferences.defaultPaymentFrequency
+    }
+
+    /// Restore a saved loan the user opened from the sidebar or dashboard.
+    private func restorePendingCalculation() {
+        guard let id = mainViewModel.takePendingLoadID(for: .loan, .mortgage) else { return }
+
+        var descriptor = FetchDescriptor<LoanCalculation>(
+            predicate: #Predicate { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        guard let saved = try? modelContext.fetch(descriptor).first else { return }
+
+        calculationName = saved.name
+        principalAmount = saved.principalAmount
+        annualInterestRate = saved.annualInterestRate
+        loanTermYears = saved.loanTermYears
+        loanTermText = String(format: "%g", saved.loanTermYears)
+        downPayment = saved.downPayment > 0 ? saved.downPayment : nil
+        extraPayment = saved.extraPayment > 0 ? saved.extraPayment : nil
+        paymentFrequency = saved.paymentFrequency
+        loanType = saved.loanType
+        currency = saved.currency
+
+        // Show the saved result immediately rather than making the user recalculate
+        calculation = saved
+        calculationResult = saved.result
+        validationErrors = []
+        didSave = false
     }
 }
 

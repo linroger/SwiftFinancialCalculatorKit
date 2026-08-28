@@ -26,6 +26,9 @@ class MainViewModel {
     
     /// Selected calculation for editing
     var selectedCalculation: FinancialCalculation?
+
+    /// A saved record the incoming calculator should restore into its fields.
+    var pendingLoadID: UUID?
     
     /// Search text for filtering calculations
     var searchText: String = ""
@@ -76,6 +79,28 @@ class MainViewModel {
     func openCalculator(_ type: CalculationType) {
         selectedCalculationType = type
         selectedCalculation = nil
+        pendingLoadID = nil
+    }
+
+    /// Open a calculator and ask it to restore a previously saved record.
+    /// The calculator picks this up on appear and clears it once loaded.
+    func openSavedCalculation(id: UUID, type: CalculationType) {
+        selectedCalculationType = type
+        selectedCalculation = nil
+        pendingLoadID = id
+    }
+
+    /// Consume the pending load request, if the calculator on screen owns it.
+    /// A calculator that serves several types (loan and mortgage share a view)
+    /// passes all of them.
+    func takePendingLoadID(for types: CalculationType...) -> UUID? {
+        guard let selected = selectedCalculationType,
+              types.contains(selected),
+              let id = pendingLoadID else {
+            return nil
+        }
+        pendingLoadID = nil
+        return id
     }
 
     /// Return the detail pane to the dashboard.
