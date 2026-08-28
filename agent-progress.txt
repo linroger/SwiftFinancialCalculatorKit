@@ -79,3 +79,19 @@ Next Steps
   35/35 unit tests pass, including 4 new retirement-math tests (closed-form vs brute-force growing annuity, zero-rate arithmetic, shortfall/depletion, sustainable-income self-consistency), temperature conversion fixed-point checks, CSV escaping, and a SwiftData insert/favorite/delete round-trip across the 10-model schema. Exchange-rate provider verified reachable and returning result:success from this machine. Build clean, zero warnings.
   Result:
   feature_list.json: 15 of 15 features passing.
+
+- 2026-08-28 (iterations 1-4, self-paced loop)
+  Branch: main → origin/v2
+  Features added this session:
+  1. Monte Carlo retirement analysis — up to 10k seeded market paths, success probability, p10/p50/p90 fan chart, sustainable income at 90% confidence, depletion age. Runs off the main actor.
+  2. Menu-bar commands — Calculators menu, ⌘0 dashboard, ⌘1-9 per calculator, ⌘⇧F favorites. MainViewModel hoisted to the App to make this possible.
+  3. Refinance analyzer (Loan Calculator) — payments-made slider derives current balance, break-even chart on closing costs, lifetime cost kept separate from monthly savings, same-payment acceleration scenario.
+  4. Debt Payoff Planner (new calculator) — avalanche vs snowball vs minimums-only, equal-budget comparison with minimum rollover, payoff order, three-curve chart, new SwiftData model storing debts as JSON.
+  5. Command palette (⌘K) — matches calculators on name/category/description/jargon; testable pure matching function.
+  6. Saved-calculation restore — the big one. Save was previously write-only across the whole app; all nine saving calculators now reopen their records with results intact, via a type-scoped pendingLoadID handshake.
+  Tests: 43 → 67, all green. Build clean, app launches/quits cleanly each iteration.
+  Three test failures during this work were my own wrong assumptions, each corrected against measured behavior rather than by loosening the assertion:
+   - volatility does NOT always lower Monte Carlo success (it raises it for a plan that already fails deterministically)
+   - milestone order != targeting order in debt payoff (a small balance with a large minimum clears first regardless of strategy)
+   - "loan" in the palette matched only one calculator — fixed the keywords, not the test
+  Remaining known gaps: UI tests still need a GUI session (macOS automation auth); Currency/Unit converters do not persist to the sidebar the way other calculators do.
