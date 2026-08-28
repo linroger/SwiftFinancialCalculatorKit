@@ -7,6 +7,7 @@ All notable changes to FinancialCalculatorKit will be documented in this file.
 ### Added
 - **Unit conversions are now saveable.** The Unit Converter was the only calculator with no persistence at all — its history vanished on quit and it never appeared in the sidebar, dashboard, or favorites. Conversions can now be named and saved like any other calculation, and restore with their category, units, and value intact. The session scratch list remains alongside it, now labeled clearly as session-only.
 - **Currency conversions restore too**, showing the rate the conversion was saved at along with the date, so a stored figure is never silently redisplayed as if it were today's rate.
+- **⌘K now searches saved work as well as calculators.** This was deliberately left out when the palette shipped, because opening a saved record would have navigated somewhere that ignored its data. Now that every calculator restores, searching by name jumps straight into the saved calculation. Saved matches rank below calculators, and only appear once you type, so the palette still opens on the tools.
 
 ## [0.6.0] - 2026-08-28
 

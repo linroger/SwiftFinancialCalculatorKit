@@ -8,11 +8,13 @@
 //
 
 import SwiftUI
+import SwiftData
 
 /// One selectable row in the palette.
 struct PaletteCommand: Identifiable {
     enum Action {
         case openCalculator(CalculationType)
+        case openSaved(id: UUID, type: CalculationType)
         case showDashboard
         case newCalculation
         case preferences
@@ -93,6 +95,18 @@ struct PaletteCommand: Identifiable {
 struct CommandPaletteView: View {
     @Environment(MainViewModel.self) private var viewModel
     @Environment(\.dismiss) private var dismiss
+
+    @Query(sort: \TimeValueCalculation.lastModified, order: .reverse) private var timeValues: [TimeValueCalculation]
+    @Query(sort: \LoanCalculation.lastModified, order: .reverse) private var loans: [LoanCalculation]
+    @Query(sort: \BondCalculation.lastModified, order: .reverse) private var bonds: [BondCalculation]
+    @Query(sort: \InvestmentCalculation.lastModified, order: .reverse) private var investments: [InvestmentCalculation]
+    @Query(sort: \OptionsCalculation.lastModified, order: .reverse) private var options: [OptionsCalculation]
+    @Query(sort: \DepreciationCalculation.lastModified, order: .reverse) private var depreciations: [DepreciationCalculation]
+    @Query(sort: \MathExpressionCalculation.lastModified, order: .reverse) private var expressions: [MathExpressionCalculation]
+    @Query(sort: \RetirementPlanCalculation.lastModified, order: .reverse) private var retirementPlans: [RetirementPlanCalculation]
+    @Query(sort: \DebtPayoffCalculation.lastModified, order: .reverse) private var debtPlans: [DebtPayoffCalculation]
+    @Query(sort: \CurrencyConversionCalculation.lastModified, order: .reverse) private var currencyConversions: [CurrencyConversionCalculation]
+    @Query(sort: \UnitConversionCalculation.lastModified, order: .reverse) private var unitConversions: [UnitConversionCalculation]
 
     @State private var query: String = ""
     @State private var selectedIndex: Int = 0
@@ -242,8 +256,41 @@ struct CommandPaletteView: View {
         return commands
     }
 
+    /// Saved records, offered only once the user types — the full list would
+    /// bury the calculators when the palette first opens.
+    private var savedCommands: [PaletteCommand] {
+        guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
+
+        func commands<T>(_ items: [T], _ type: CalculationType, name: (T) -> String, id: (T) -> UUID) -> [PaletteCommand] {
+            items.prefix(20).map { item in
+                PaletteCommand(
+                    title: name(item),
+                    subtitle: "Saved · \(type.displayName)",
+                    systemImage: type.systemImage,
+                    keywords: "saved \(type.displayName)",
+                    action: .openSaved(id: id(item), type: type)
+                )
+            }
+        }
+
+        return commands(timeValues, .timeValue, name: \.name, id: \.id)
+            + commands(loans, .loan, name: \.name, id: \.id)
+            + commands(bonds, .bond, name: \.name, id: \.id)
+            + commands(investments, .investment, name: \.name, id: \.id)
+            + commands(options, .options, name: \.name, id: \.id)
+            + commands(depreciations, .depreciation, name: \.name, id: \.id)
+            + commands(expressions, .mathExpression, name: \.name, id: \.id)
+            + commands(retirementPlans, .retirement, name: \.name, id: \.id)
+            + commands(debtPlans, .debtPayoff, name: \.name, id: \.id)
+            + commands(currencyConversions, .currency, name: \.name, id: \.id)
+            + commands(unitConversions, .conversion, name: \.name, id: \.id)
+    }
+
     private var matches: [PaletteCommand] {
+        // Calculators rank first; saved records follow, so typing a calculator
+        // name never buries it under similarly-named saved work
         PaletteCommand.matching(query, in: allCommands)
+            + PaletteCommand.matching(query, in: savedCommands)
     }
 
     // MARK: - Interaction
@@ -261,6 +308,8 @@ struct CommandPaletteView: View {
         switch command.action {
         case .openCalculator(let type):
             viewModel.openCalculator(type)
+        case .openSaved(let id, let type):
+            viewModel.openSavedCalculation(id: id, type: type)
         case .showDashboard:
             viewModel.showDashboard()
         case .newCalculation:
