@@ -28,6 +28,7 @@ struct LoanCalculatorView: View {
     @State private var calculationResult: CalculationResult?
     @State private var validationErrors: [String] = []
     @State private var showAmortizationTable: Bool = false
+    @State private var showingRefinance: Bool = false
     @State private var didSave: Bool = false
     
     private var isMortgage: Bool {
@@ -69,6 +70,12 @@ struct LoanCalculatorView: View {
                         }
                     }
                     .buttonStyle(.bordered)
+
+                    Button("Refinance") {
+                        showingRefinance = true
+                    }
+                    .buttonStyle(.bordered)
+                    .help("Compare this loan against a new offer")
                 }
                 
                 Button(didSave ? "Saved" : "Save", systemImage: didSave ? "checkmark" : "square.and.arrow.down") {
@@ -81,6 +88,14 @@ struct LoanCalculatorView: View {
                 }
                 .buttonStyle(.bordered)
             }
+        }
+        .sheet(isPresented: $showingRefinance) {
+            RefinanceAnalysisSheet(
+                originalPrincipal: (principalAmount ?? 0) - (isMortgage ? (downPayment ?? 0) : 0),
+                originalAnnualRate: annualInterestRate ?? 0,
+                originalTermMonths: Int(paymentFrequency.numberOfPeriods(from: loanTermYears ?? 0).rounded()),
+                currency: currency
+            )
         }
         .onAppear {
             loadUserPreferences()

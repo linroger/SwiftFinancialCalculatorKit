@@ -2,6 +2,12 @@
 
 All notable changes to FinancialCalculatorKit will be documented in this file.
 
+## [0.5.0] - 2026-08-28
+
+### Added
+- **Refinance analyzer** in the Loan Calculator: compares the loan on screen against a new offer. A slider for "payments already made" derives today's balance and remaining term from the existing loan, so nothing has to be re-entered. Reports the payment comparison, break-even month on closing costs with a cumulative-position chart showing the crossover, and lifetime cost — the two are kept separate because a lower payment over a longer term routinely costs more overall, and the analyzer says so plainly when that happens. Also models keeping your current payment on the new loan, which directs the whole rate cut at principal.
+- 7 tests for the refinance math, including a closed-form-vs-iterative amortization cross-check and the term-extension case where the payment falls while lifetime cost rises
+
 ## [0.4.0] - 2026-08-28
 
 ### Added

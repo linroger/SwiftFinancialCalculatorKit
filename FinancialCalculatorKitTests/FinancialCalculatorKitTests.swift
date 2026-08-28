@@ -408,6 +408,137 @@ struct FinancialCalculatorKitTests {
         #expect(abs(rebalanced.surplus) < 1.0)
     }
 
+    // MARK: - Refinance analysis
+
+    @Test func refinancePaymentAgreesWithTheLoanModel() async throws {
+        let payment = RefinanceAnalyzer.monthlyPayment(
+            principal: 300_000, annualRate: 6, months: 360
+        )
+        #expect(abs(payment - 1_798.65) < 0.01)
+
+        // Zero-rate loans are straight division
+        let zeroRate = RefinanceAnalyzer.monthlyPayment(principal: 12_000, annualRate: 0, months: 24)
+        #expect(abs(zeroRate - 500) < 1e-9)
+    }
+
+    @Test func remainingBalanceMatchesAnIterativeAmortization() async throws {
+        let principal = 300_000.0
+        let rate = 6.0
+        let term = 360
+        let paymentsMade = 60
+
+        // Walk the schedule by hand and compare against the closed form
+        let payment = RefinanceAnalyzer.monthlyPayment(principal: principal, annualRate: rate, months: term)
+        var balance = principal
+        for _ in 0..<paymentsMade {
+            balance += balance * (rate / 100 / 12)
+            balance -= payment
+        }
+
+        let closedForm = RefinanceAnalyzer.remainingBalance(
+            principal: principal, annualRate: rate, termMonths: term, paymentsMade: paymentsMade
+        )
+        #expect(abs(closedForm - balance) < 0.01)
+
+        // Endpoints
+        #expect(RefinanceAnalyzer.remainingBalance(
+            principal: principal, annualRate: rate, termMonths: term, paymentsMade: 0
+        ) == principal)
+        #expect(RefinanceAnalyzer.remainingBalance(
+            principal: principal, annualRate: rate, termMonths: term, paymentsMade: term
+        ) < 0.01)
+    }
+
+    @Test func refinanceBreakEvenReflectsCashPaidAtClosing() async throws {
+        // 250k at 6% with 25 years left, refinanced to 4.5% over the same 25 years
+        let analysis = try #require(RefinanceAnalyzer.analyze(
+            RefinanceScenario(
+                currentBalance: 250_000, currentAnnualRate: 6, remainingMonths: 300,
+                newAnnualRate: 4.5, newTermMonths: 300,
+                closingCosts: 6_000, financeClosingCosts: false
+            )
+        ))
+
+        #expect(analysis.monthlySavings > 0)
+        #expect(analysis.upfrontCost == 6_000)
+
+        // Break-even is the closing cost divided by the monthly saving
+        let expected = Int((6_000 / analysis.monthlySavings).rounded(.up))
+        #expect(analysis.breakEvenMonths == expected)
+
+        // Same term at a lower rate must win on both axes
+        #expect(analysis.lifetimeSavings > 0)
+        #expect(analysis.newTotalInterest < analysis.currentRemainingInterest)
+        #expect(!analysis.extendsTerm)
+    }
+
+    @Test func financingClosingCostsRemovesUpfrontCashButRaisesPrincipal() async throws {
+        let scenario = RefinanceScenario(
+            currentBalance: 250_000, currentAnnualRate: 6, remainingMonths: 300,
+            newAnnualRate: 4.5, newTermMonths: 300,
+            closingCosts: 6_000, financeClosingCosts: true
+        )
+        let analysis = try #require(RefinanceAnalyzer.analyze(scenario))
+
+        #expect(analysis.upfrontCost == 0)
+        #expect(analysis.newPrincipal == 256_000)
+        // No cash at risk, so the saving starts immediately
+        #expect(analysis.breakEvenMonths == 0)
+    }
+
+    @Test func stretchingTheTermCanLowerThePaymentAndRaiseTotalCost() async throws {
+        // 22 years left, refinanced into a fresh 30 years at a slightly better rate
+        let analysis = try #require(RefinanceAnalyzer.analyze(
+            RefinanceScenario(
+                currentBalance: 250_000, currentAnnualRate: 6, remainingMonths: 264,
+                newAnnualRate: 5.5, newTermMonths: 360,
+                closingCosts: 0, financeClosingCosts: false
+            )
+        ))
+
+        #expect(analysis.extendsTerm)
+        #expect(analysis.monthlySavings > 0)      // the payment falls
+        #expect(analysis.lifetimeSavings < 0)     // yet the loan costs more overall
+    }
+
+    @Test func keepingTheOldPaymentRetiresTheNewLoanEarly() async throws {
+        let analysis = try #require(RefinanceAnalyzer.analyze(
+            RefinanceScenario(
+                currentBalance: 250_000, currentAnnualRate: 6, remainingMonths: 300,
+                newAnnualRate: 4.5, newTermMonths: 300,
+                closingCosts: 0, financeClosingCosts: false
+            )
+        ))
+
+        let months = try #require(analysis.samePaymentPayoffMonths)
+        let saved = try #require(analysis.samePaymentInterestSaved)
+
+        #expect(months < 300)
+        #expect(saved > 0)
+        #expect((analysis.samePaymentInterest ?? .infinity) < analysis.newTotalInterest)
+    }
+
+    @Test func refinanceRejectsUnusableInput() async throws {
+        #expect(RefinanceAnalyzer.analyze(
+            RefinanceScenario(
+                currentBalance: 0, currentAnnualRate: 6, remainingMonths: 300,
+                newAnnualRate: 4.5, newTermMonths: 300,
+                closingCosts: 0, financeClosingCosts: false
+            )
+        ) == nil)
+
+        #expect(RefinanceAnalyzer.analyze(
+            RefinanceScenario(
+                currentBalance: 250_000, currentAnnualRate: 6, remainingMonths: 300,
+                newAnnualRate: 4.5, newTermMonths: 0,
+                closingCosts: 0, financeClosingCosts: false
+            )
+        ) == nil)
+
+        // A payment that cannot cover the first month's interest never retires the loan
+        #expect(RefinanceAnalyzer.payoffMonths(principal: 100_000, annualRate: 6, payment: 100) == nil)
+    }
+
     // MARK: - Monte Carlo retirement analysis
 
     /// Shared baseline: a comfortable plan used across the simulation tests.
