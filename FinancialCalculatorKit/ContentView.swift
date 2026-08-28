@@ -683,6 +683,7 @@ struct HelpView: View {
 enum HelpSectionType: String, CaseIterable, Identifiable {
     case gettingStarted
     case calculators
+    case analysisTools
     case features
     case shortcuts
     case about
@@ -693,6 +694,7 @@ enum HelpSectionType: String, CaseIterable, Identifiable {
         switch self {
         case .gettingStarted: return "Getting Started"
         case .calculators: return "Calculators"
+        case .analysisTools: return "Analysis Tools"
         case .features: return "Features"
         case .shortcuts: return "Keyboard Shortcuts"
         case .about: return "About"
@@ -703,6 +705,7 @@ enum HelpSectionType: String, CaseIterable, Identifiable {
         switch self {
         case .gettingStarted: return "Learn the basics of FinancialCalculatorKit"
         case .calculators: return "Explore all available calculator types"
+        case .analysisTools: return "Deeper analysis hiding inside the calculators"
         case .features: return "Discover powerful features"
         case .shortcuts: return "Speed up your workflow"
         case .about: return "About this application"
@@ -713,6 +716,7 @@ enum HelpSectionType: String, CaseIterable, Identifiable {
         switch self {
         case .gettingStarted: return "graduationcap"
         case .calculators: return "function"
+        case .analysisTools: return "scope"
         case .features: return "star"
         case .shortcuts: return "keyboard"
         case .about: return "info.circle"
@@ -726,6 +730,8 @@ enum HelpSectionType: String, CaseIterable, Identifiable {
             GettingStartedContent()
         case .calculators:
             CalculatorsHelpContent()
+        case .analysisTools:
+            AnalysisToolsHelpContent()
         case .features:
             FeaturesHelpContent()
         case .shortcuts:
@@ -762,9 +768,16 @@ struct GettingStartedContent: View {
             
             HelpStepView(
                 number: 4,
-                title: "Save & Export",
-                description: "Save your calculations for future reference or export them in various formats.",
+                title: "Save and Come Back To It",
+                description: "Name a calculation and save it. It appears in the sidebar and dashboard, and reopening it restores every input and result exactly as you left them.",
                 icon: "square.and.arrow.down"
+            )
+
+            HelpStepView(
+                number: 5,
+                title: "Compare and Export",
+                description: "Put saved scenarios side by side with ⌘⇧C, or export any result and its full schedule to CSV.",
+                icon: "square.on.square"
             )
         }
     }
@@ -848,16 +861,109 @@ struct CalculatorHelpCard: View {
     }
 }
 
+/// The deeper analyses live behind buttons and menus inside individual
+/// calculators, so they are easy to miss. This section names where each one is
+/// and, just as importantly, what it will not tell you.
+struct AnalysisToolsHelpContent: View {
+    private let tools: [(icon: String, title: String, whereToFind: String, what: String, caveat: String)] = [
+        (
+            "chart.line.uptrend.xyaxis",
+            "Monte Carlo Retirement Analysis",
+            "Retirement Planner → Run Monte Carlo Analysis",
+            "Simulates thousands of market paths to estimate how often your plan funds its income for life, with a band showing the range of balances and the income sustainable at 90% confidence.",
+            "It models returns as a normal distribution around your assumptions. Real markets have fatter tails, so treat the probability as a comparison tool between plans, not a forecast."
+        ),
+        (
+            "arrow.triangle.2.circlepath",
+            "Refinance Analysis",
+            "Loan Calculator → Refinance",
+            "Compares your current loan against a new offer: payment change, break-even month on closing costs, and lifetime cost. Also shows what happens if you keep paying your old payment on the new loan.",
+            "Monthly savings and lifetime cost are reported separately on purpose. Stretching the term lowers the payment while raising total interest, and only you can decide which matters more."
+        ),
+        (
+            "square.on.square",
+            "Scenario Comparison",
+            "Calculators menu → Compare Scenarios (⌘⇧C)",
+            "Places two to four saved calculations of the same kind side by side, with each metric's difference from the first column.",
+            "It does not pick a winner. Whether a larger number is better depends on the metric, so the judgement is left to you."
+        ),
+        (
+            "chart.bar.xaxis",
+            "Debt Strategy Comparison",
+            "Debt Payoff Planner → Compare Strategies",
+            "Runs avalanche, snowball, and minimums-only on the same monthly budget, rolling each cleared minimum into the next debt.",
+            "Avalanche always costs the least interest. Snowball is offered because clearing a balance sooner is what keeps some people going, not because the arithmetic favours it."
+        ),
+        (
+            "function",
+            "Greeks and Skew Scenarios",
+            "Options Calculator → Greeks Analysis / Skew Scenario",
+            "Plots how delta and gamma move across spot prices, and how premium responds across strikes and expiries.",
+            "The skew scenario is modelled from the volatility you entered using an illustrative adjustment. Those are not market-implied volatilities."
+        ),
+        (
+            "tablecells",
+            "Schedules and Sensitivity",
+            "Loan, Bond, and Depreciation calculators",
+            "Full amortization schedules, bond cash-flow tables with rate-shock profiles, and depreciation schedules with method comparison.",
+            "Every schedule can be exported to CSV from the same calculator's overflow menu."
+        )
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            ForEach(tools, id: \.title) { tool in
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 10) {
+                        Image(systemName: tool.icon)
+                            .font(.title3)
+                            .foregroundColor(.accentColor)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(tool.title)
+                                .font(.headline)
+                            Text(tool.whereToFind)
+                                .font(.caption)
+                                .foregroundColor(.accentColor)
+                        }
+                    }
+
+                    Text(tool.what)
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "info.circle")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(tool.caveat)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color(NSColor.controlBackgroundColor))
+                )
+            }
+        }
+    }
+}
+
 struct FeaturesHelpContent: View {
     let features = [
-        ("chart.line.uptrend.xyaxis", "Interactive Charts", "Visualize your financial data with dynamic charts that respond to input changes."),
-        ("dollarsign.circle", "Multi-Currency Support", "Work with 16 currencies including USD, EUR, GBP, JPY, and more."),
-        ("square.and.arrow.up", "CSV Export", "Export calculation results and schedules to CSV files."),
-        ("clock.arrow.circlepath", "Calculation History", "Access your previous calculations quickly from the sidebar."),
-        ("heart", "Favorites", "Mark frequently used calculations as favorites for quick access."),
-        ("magnifyingglass", "Search", "Quickly find calculations using the search feature."),
-        ("paintbrush", "Customizable", "Adjust decimal places, date formats, and default currencies."),
-        ("keyboard", "Keyboard Shortcuts", "Speed up your workflow with convenient keyboard shortcuts.")
+        ("chart.line.uptrend.xyaxis", "Interactive Charts", "Amortization balances, cash-flow timelines, payoff curves, and probability bands, all drawn from your inputs."),
+        ("square.on.square", "Scenario Comparison", "Put two to four saved calculations of the same kind side by side and see exactly where they differ."),
+        ("arrow.uturn.backward.circle", "Save and Reopen", "Saved calculations restore with every input and result intact, so you can pick a plan back up later."),
+        ("magnifyingglass", "Quick Open", "Press ⌘K to jump to any calculator or saved calculation by name — or by the jargon, like “greeks” or “MACRS”."),
+        ("dollarsign.circle", "Multi-Currency Support", "Work in any of 16 currencies, with formatting that follows your region."),
+        ("square.and.arrow.up", "CSV Export", "Export results and full schedules to CSV for a spreadsheet."),
+        ("heart", "Favorites", "Mark the calculations you return to and filter the sidebar down to them with ⌘⇧F."),
+        ("keyboard", "Keyboard Shortcuts", "Reach every calculator from the Calculators menu without touching the mouse.")
     ]
     
     var body: some View {
@@ -901,7 +1007,8 @@ struct FeatureCard: View {
 
 struct ShortcutsHelpContent: View {
     let shortcuts = [
-        ("⌘ K", "Quick Open — jump to any calculator"),
+        ("⌘ K", "Quick Open — jump to any calculator or saved calculation"),
+        ("⌘ ⇧ C", "Compare saved scenarios side by side"),
         ("⌘ N", "New Calculation"),
         ("⌘ 0", "Go to Dashboard"),
         ("⌘ 1–9", "Jump to a calculator (Calculators menu)"),
@@ -979,9 +1086,11 @@ struct AboutHelpContent: View {
                 
                 Text("• Time Value of Money calculations (PV, FV, PMT, Rate, Periods)")
                 Text("• Loan and mortgage analysis with amortization schedules")
-                Text("• Retirement planning with nest-egg projection and gap analysis")
-                Text("• Bond pricing and yield calculations")
-                Text("• Investment analysis (NPV, IRR, MIRR)")
+                Text("• Refinance analysis with break-even and lifetime cost")
+                Text("• Debt payoff strategies (avalanche, snowball, minimums)")
+                Text("• Retirement planning with Monte Carlo probability of success")
+                Text("• Bond pricing, yield, duration, and convexity")
+                Text("• Investment analysis (NPV, IRR, MIRR, payback)")
                 Text("• Black-Scholes options pricing with Greeks")
                 Text("• Depreciation calculations (Straight-line, Declining balance, MACRS)")
                 Text("• Currency conversion with 16 currencies")
