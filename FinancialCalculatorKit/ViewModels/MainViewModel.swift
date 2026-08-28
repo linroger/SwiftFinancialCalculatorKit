@@ -17,6 +17,7 @@ class MainViewModel {
         case preferences
         case help
         case commandPalette
+        case scenarioComparison
 
         var id: String { rawValue }
     }
@@ -122,6 +123,11 @@ class MainViewModel {
     /// Open the ⌘K command palette.
     func showCommandPalette() {
         presentedSheet = .commandPalette
+    }
+
+    /// Open the side-by-side scenario comparison.
+    func showScenarioComparison() {
+        presentedSheet = .scenarioComparison
     }
 
     /// Dismiss any active sheet.

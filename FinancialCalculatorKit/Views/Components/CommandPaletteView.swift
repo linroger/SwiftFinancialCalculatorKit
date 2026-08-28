@@ -17,6 +17,7 @@ struct PaletteCommand: Identifiable {
         case openSaved(id: UUID, type: CalculationType)
         case showDashboard
         case newCalculation
+        case compareScenarios
         case preferences
         case help
         case toggleFavorites
@@ -224,6 +225,13 @@ struct CommandPaletteView: View {
                 systemImage: "plus.circle",
                 keywords: "create add",
                 action: .newCalculation
+            ),
+            PaletteCommand(
+                title: "Compare Scenarios",
+                subtitle: "Put saved calculations side by side",
+                systemImage: "square.on.square",
+                keywords: "diff versus side by side scenarios",
+                action: .compareScenarios
             )
         ]
 
@@ -314,6 +322,8 @@ struct CommandPaletteView: View {
             viewModel.showDashboard()
         case .newCalculation:
             viewModel.createNewCalculation(type: viewModel.selectedCalculationType)
+        case .compareScenarios:
+            viewModel.showScenarioComparison()
         case .preferences:
             viewModel.showPreferences()
         case .help:

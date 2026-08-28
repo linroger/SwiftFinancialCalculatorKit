@@ -2,6 +2,12 @@
 
 All notable changes to FinancialCalculatorKit will be documented in this file.
 
+## [0.8.0] - 2026-08-29
+
+### Added
+- **Scenario comparison (⌘⇧C)**: put two to four saved calculations of the same type side by side — two mortgage structures, two retirement plans, two debt strategies. Every metric either scenario reports appears as a row, with the difference from the baseline column beneath each value. It deliberately does *not* crown a winner: whether a bigger number is better depends on the metric, and guessing would mislead. Only calculator types with at least two saved records are offered.
+- Value formatting is now shared between result cards and the comparison table, so a figure reads identically wherever it appears, and non-finite values render as an em dash rather than "nan".
+
 ## [0.7.0] - 2026-08-28
 
 ### Added

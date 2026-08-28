@@ -88,6 +88,11 @@ struct CalculatorCommands: Commands {
             }
             .keyboardShortcut("k", modifiers: .command)
 
+            Button("Compare Scenarios…") {
+                viewModel.showScenarioComparison()
+            }
+            .keyboardShortcut("c", modifiers: [.command, .shift])
+
             Button("Dashboard") {
                 viewModel.showDashboard()
             }

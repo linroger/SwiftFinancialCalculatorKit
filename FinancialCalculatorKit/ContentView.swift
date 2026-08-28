@@ -33,6 +33,8 @@ struct ContentView: View {
             case .commandPalette:
                 CommandPaletteView()
                     .environment(viewModel)
+            case .scenarioComparison:
+                ScenarioComparisonView()
             }
         }
         .alert("Error", isPresented: $viewModel.showingError) {

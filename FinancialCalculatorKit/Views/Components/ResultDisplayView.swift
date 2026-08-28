@@ -178,14 +178,7 @@ struct SecondaryValueRow: View {
     }
     
     private var formattedValue: String {
-        // Determine if this is a currency value, percentage, or other
-        if title.lowercased().contains("rate") || title.lowercased().contains("percentage") {
-            return String(format: "%.3f%%", value)
-        } else if title.lowercased().contains("year") || title.lowercased().contains("period") {
-            return String(format: "%.1f", value)
-        } else {
-            return currency.formatValue(value)
-        }
+        SecondaryValueFormatter.format(key: title, value: value, currency: currency)
     }
 }
 

@@ -534,6 +534,55 @@ struct FinancialCalculatorKitTests {
         #expect(restored.result.explanation.contains("100 °C"))
     }
 
+    // MARK: - Secondary value formatting
+
+    @Test func secondaryValuesFormatByUnitNotJustByName() async throws {
+        func format(_ key: String, _ value: Double) -> String {
+            SecondaryValueFormatter.format(key: key, value: value, currency: .usd)
+        }
+
+        // Rate-ish keys render as percentages
+        #expect(format("Annual Interest Rate", 5.25) == "5.250%")
+        #expect(format("Effective Annual Rate", 5.116) == "5.116%")
+
+        // Time keys render as plain numbers.
+        // Avoid exact binary ties like 3.25 here — printf rounds those to even,
+        // so 3.25 renders "3.2" and the assertion would be testing rounding mode
+        // rather than the formatter's routing.
+        #expect(format("Number of Years", 12.5) == "12.5")
+        #expect(format("Payback Period", 3.26) == "3.3")
+
+        // Everything else is money
+        #expect(format("Total Interest", 1234.5).contains("1,234.50"))
+
+        // "NPV at IRR" contains a rate word but holds money — the exception list
+        // keeps it from rendering as a percentage
+        #expect(format("NPV at IRR", 1234.5).contains("1,234.50"))
+
+        // Counts stay whole
+        #expect(format("Debts", 3) == "3")
+        #expect(format("Number of Coupon Payments", 20) == "20")
+
+        // Non-finite values never reach the user as "nan"
+        #expect(format("Total Interest", .nan) == "—")
+        #expect(format("Total Interest", .infinity) == "—")
+    }
+
+    @Test func deltasCarryTheirSignAndCollapseWhenNegligible() async throws {
+        func delta(_ key: String, _ value: Double) -> String {
+            SecondaryValueFormatter.formatDelta(key: key, delta: value, currency: .usd)
+        }
+
+        #expect(delta("Total Interest", 500).hasPrefix("+"))
+        #expect(delta("Total Interest", -500).hasPrefix("−"))
+        #expect(delta("Annual Interest Rate", 1.5) == "+1.500%")
+
+        // Rounding noise should read as "no difference", not "+$0.00"
+        #expect(delta("Total Interest", 0.001) == "—")
+        #expect(delta("Total Interest", 0) == "—")
+        #expect(delta("Total Interest", .nan) == "—")
+    }
+
     // MARK: - Command palette
 
     @Test func paletteFindsCalculatorsByNameAndJargon() async throws {
